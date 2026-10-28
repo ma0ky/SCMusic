@@ -54,6 +54,12 @@ const MIGRATIONS: string[] = [
   ALTER TABLE tracks ADD COLUMN cover_source TEXT;
   ALTER TABLE tracks ADD COLUMN cover_checked INTEGER NOT NULL DEFAULT 0;
   `,
+  // v3 : paroles (texte LRC ou simple), venant de nom.lrc ou des tags du fichier.
+  // lyrics_checked = 1 quand les tags du fichier ont déjà été inspectés pour les paroles.
+  `
+  ALTER TABLE tracks ADD COLUMN lyrics TEXT;
+  ALTER TABLE tracks ADD COLUMN lyrics_checked INTEGER NOT NULL DEFAULT 0;
+  `,
 ];
 
 export async function migrate(): Promise<void> {

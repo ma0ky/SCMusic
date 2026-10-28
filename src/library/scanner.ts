@@ -2,10 +2,11 @@
 // Sur Android, le dossier est choisi via le sélecteur système (accès SAF, URIs content://).
 import { Directory, File, FileMode } from 'expo-file-system';
 import {
-  getSetting, insertTrack, knownUris, removeTracksNotIn, setScannedCover, setSetting, urisWithoutCoverCheck,
-  type CoverSource,
+  getSetting, insertTrack, knownUris, removeTracksNotIn, setScannedCover, setScannedLyrics, setSetting, urisWithoutCoverCheck,
+  urisWithoutLyricsCheck, type CoverSource,
 } from '@/db/queries';
 import { pickFolderCover, pickSidecarCover, saveCover, saveCoverFromFile } from './covers';
+import { cleanLyrics, pickSidecarLyrics } from './lyrics';
 import { id3TagSize, parseTags } from './tags';
 
 const AUDIO_EXT = /\.(mp3|flac)$/i;
@@ -30,6 +31,7 @@ export async function pickMusicDir(): Promise<string | null> {
 interface AudioEntry {
   file: File;
   sidecar: File | null; // nom.png à côté de nom.mp3
+  lrc: File | null; // nom.lrc à côté de nom.mp3
   folderCover: File | null; // cover.jpg / folder.png… du même dossier
 }
 
@@ -43,7 +45,12 @@ function listAudioFiles(dir: Directory, out: AudioEntry[] = [], depth = 0): Audi
   const folderCover = byName(pickFolderCover(names));
   for (const entry of entries) {
     if (entry instanceof Directory) listAudioFiles(entry, out, depth + 1);
-    else if (AUDIO_EXT.test(entry.name)) out.push({ file: entry, sidecar: byName(pickSidecarCover(entry.name, names)), folderCover });
+    else if (AUDIO_EXT.test(entry.name)) out.push({
+      file: entry,
+      sidecar: byName(pickSidecarCover(entry.name, names)),
+      lrc: byName(pickSidecarLyrics(entry.name, names)),
+      folderCover,
+    });
   }
   return out;
 }
@@ -106,6 +113,19 @@ async function findCover(
   return { uri: null, source: null };
 }
 
+/** Paroles d'un morceau : fichier nom.lrc en priorité, sinon celles intégrées aux tags. */
+async function findLyrics(lrc: File | null, fromTags: string | undefined): Promise<string | null> {
+  if (lrc) {
+    try {
+      const text = cleanLyrics(await lrc.text());
+      if (text) return text;
+    } catch (e) {
+      console.warn('Paroles illisibles :', lrc.name, e);
+    }
+  }
+  return cleanLyrics(fromTags);
+}
+
 export interface ScanProgress {
   done: number;
   total: number;
@@ -116,48 +136,68 @@ export interface ScanResult {
   removed: number;
   failed: number;
   covers: number; // morceaux pour lesquels une pochette a été trouvée
+  lyrics: number; // morceaux pour lesquels des paroles ont été trouvées
 }
 
 export async function scanLibrary(dirUri: string, onProgress?: (p: ScanProgress) => void): Promise<ScanResult> {
   const entries = listAudioFiles(new Directory(dirUri));
   const known = await knownUris();
   const needCover = await urisWithoutCoverCheck();
+  const needLyrics = await urisWithoutLyricsCheck();
   const folderCache = new Map<string, string>();
   const seen = new Set<string>();
   let added = 0;
   let failed = 0;
   let covers = 0;
+  let lyricsFound = 0;
 
   for (let i = 0; i < entries.length; i++) {
-    const { file, sidecar, folderCover } = entries[i];
+    const { file, sidecar, lrc, folderCover } = entries[i];
     seen.add(file.uri);
     const isNew = !known.has(file.uri);
-    if (isNew || needCover.has(file.uri)) {
+    const coverToCheck = isNew || needCover.has(file.uri);
+    const lyricsToCheck = isNew || needLyrics.has(file.uri);
+    if (coverToCheck || lyricsToCheck) {
       try {
-        const { picture, ...tags } = parseTags(await readMetadata(file), file.name);
-        const cover = await findCover(sidecar, picture, folderCover, folderCache);
-        if (cover.uri) covers++;
-        if (isNew) {
-          await insertTrack({ uri: file.uri, filename: file.name, ...tags, coverUri: cover.uri, coverSource: cover.source });
-          added++;
-        } else {
-          await setScannedCover(file.uri, cover.uri, cover.source);
+        const { picture, lyrics: tagLyrics, ...tags } = parseTags(await readMetadata(file), file.name);
+        const lyrics = await findLyrics(lrc, tagLyrics);
+        if (lyrics) lyricsFound++;
+        if (coverToCheck) {
+          const cover = await findCover(sidecar, picture, folderCover, folderCache);
+          if (cover.uri) covers++;
+          if (isNew) {
+            await insertTrack({ uri: file.uri, filename: file.name, ...tags, coverUri: cover.uri, coverSource: cover.source, lyrics });
+            added++;
+          } else {
+            await setScannedCover(file.uri, cover.uri, cover.source);
+          }
         }
+        if (!isNew) await setScannedLyrics(file.uri, lyrics);
       } catch (e) {
         console.warn('Lecture impossible :', file.name, e);
         failed++;
       }
-    } else if (sidecar) {
-      // Morceau déjà connu : une image nom.png ajoutée depuis le dernier scan est prise en compte
-      try {
-        await setScannedCover(file.uri, await saveCoverFromFile(sidecar), 'file');
-        covers++;
-      } catch (e) {
-        console.warn('Image illisible :', sidecar.name, e);
+    }
+    if (!isNew) {
+      // Morceau déjà connu : une image nom.png ou des paroles nom.lrc ajoutées depuis le dernier scan sont prises en compte
+      if (sidecar && !coverToCheck) {
+        try {
+          await setScannedCover(file.uri, await saveCoverFromFile(sidecar), 'file');
+          covers++;
+        } catch (e) {
+          console.warn('Image illisible :', sidecar.name, e);
+        }
+      }
+      if (lrc && !lyricsToCheck) {
+        const lyrics = await findLyrics(lrc, undefined);
+        if (lyrics) {
+          await setScannedLyrics(file.uri, lyrics);
+          lyricsFound++;
+        }
       }
     }
     if (i % 10 === 0 || i === entries.length - 1) onProgress?.({ done: i + 1, total: entries.length });
   }
   const removed = await removeTracksNotIn(seen, dirUri);
-  return { added, removed, failed, covers };
+  return { added, removed, failed, covers, lyrics: lyricsFound };
 }

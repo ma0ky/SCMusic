@@ -128,3 +128,15 @@ describe('pochettes intégrées', () => {
     expect(parseId3(id3v23([['TIT2', textLatin1('X')]])).picture).toBeUndefined();
   });
 });
+
+describe('paroles intégrées', () => {
+  test('ID3 : frame USLT (langue + description + texte UTF-16)', () => {
+    const body = textUtf16('[00:01.00] Été');
+    const uslt = concat(Uint8Array.of(1), latin1('fra'), Uint8Array.of(0xff, 0xfe, 0, 0), body.subarray(1));
+    expect(parseId3(id3v23([['USLT', uslt]])).lyrics).toBe('[00:01.00] Été');
+  });
+
+  test('FLAC : commentaire LYRICS', () => {
+    expect(parseFlac(flac(['TITLE=X', 'LYRICS=ligne 1\nligne 2'])).lyrics).toBe('ligne 1\nligne 2');
+  });
+});

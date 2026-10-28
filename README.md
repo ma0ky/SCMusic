@@ -2,6 +2,7 @@
 
 Lecteur de musique **local, libre et open source** (GPL-3.0) pour Android, construit avec Expo / React Native.
 Il lit les MP3 et FLAC que tu possèdes, sans compte, sans serveur, sans publicité.
+La seule connexion à Internet est la recherche de paroles, et seulement quand tu la demandes.
 
 ## Fonctionnalités (MVP)
 
@@ -9,6 +10,10 @@ Il lit les MP3 et FLAC que tu possèdes, sans compte, sans serveur, sans publici
 - **File d'attente** : suivant, précédent, aléatoire, répétition (tout / un), réorganisation, « lire ensuite »
 - **Bibliothèque** : titres, albums, artistes, titres aimés (tags ID3 / FLAC lus dans les fichiers)
 - **Playlists** : créer, renommer, réordonner, retirer des titres, supprimer
+- **Paroles** : synchronisées comme sur Spotify (la ligne chantée suit la musique, toucher une ligne y saute). Bouton micro dans le lecteur, puis :
+  - **Chercher en ligne** : interroge [LRCLIB](https://lrclib.net) (libre, sans compte) **uniquement quand tu appuies** ; seuls le titre et l'artiste sont envoyés
+  - **Coller / écrire** le texte copié depuis un site, puis **Synchroniser au doigt** : la musique joue, tu touches « Ligne suivante » au début de chaque ligne
+  - ou un fichier `nom.lrc` à côté de `nom.mp3`, ou les paroles intégrées au fichier (USLT / LYRICS), lus à l'analyse
 - **Recherche** : titres, artistes et albums (accents et majuscules ignorés)
 - **Partage** : export / import de playlists entre deux téléphones, dans le respect du droit d'auteur (voir plus bas)
 
@@ -72,7 +77,7 @@ __tests__/        tests Jest
 
 ## Feuille de route
 
-- **Phase 2** : paroles synchronisées (LRCLIB), thème clair / sombre
+- **Phase 2** : thème clair / sombre
 - **Phase 3** : statistiques d'écoute
 
 ## Licence

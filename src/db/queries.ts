@@ -33,12 +33,16 @@ const toTrack = (r: TrackRow): Track => ({
   coverUri: r.cover_uri,
 });
 
+// Colonnes lues pour un Track : jamais les paroles, qui peuvent peser plusieurs Ko par titre.
+const TRACK_COLS = 'id, uri, filename, title, artist, album, track_no, duration, license, liked, added_at, cover_uri';
+const TRACK_COLS_T = TRACK_COLS.split(', ').map((c) => `t.${c}`).join(', ');
+
 const ORDER_BY_ALBUM = 'ORDER BY artist COLLATE NOCASE, album COLLATE NOCASE, track_no, title COLLATE NOCASE';
 
 // ---------- Morceaux ----------
 
 export async function allTracks(): Promise<Track[]> {
-  const rows = await getDb().getAllAsync<TrackRow>(`SELECT * FROM tracks ORDER BY title COLLATE NOCASE`);
+  const rows = await getDb().getAllAsync<TrackRow>(`SELECT ${TRACK_COLS} FROM tracks ORDER BY title COLLATE NOCASE`);
   return rows.map(toTrack);
 }
 
@@ -58,17 +62,19 @@ export interface NewTrack {
   license?: TrackLicense;
   coverUri?: string | null;
   coverSource?: CoverSource | null;
+  lyrics?: string | null;
 }
 
 export type CoverSource = 'file' | 'tag' | 'folder' | 'manual';
 
 export async function insertTrack(t: NewTrack): Promise<number> {
   const res = await getDb().runAsync(
-    `INSERT INTO tracks (uri, filename, title, artist, album, track_no, duration, license, added_at, cover_uri, cover_source, cover_checked)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    `INSERT INTO tracks (uri, filename, title, artist, album, track_no, duration, license, added_at, cover_uri, cover_source, cover_checked,
+       lyrics, lyrics_checked)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, 1)
      ON CONFLICT(uri) DO NOTHING`,
     t.uri, t.filename, t.title, t.artist, t.album, t.trackNo ?? null, t.duration ?? null, t.license ?? 'personal', Date.now(),
-    t.coverUri ?? null, t.coverSource ?? null,
+    t.coverUri ?? null, t.coverSource ?? null, t.lyrics ?? null,
   );
   return res.lastInsertRowId;
 }
@@ -105,8 +111,32 @@ export async function setAlbumCover(album: string, coverUri: string | null): Pro
   );
 }
 
+// ---------- Paroles ----------
+
+/** URIs des morceaux dont les tags n'ont jamais été inspectés pour les paroles (scannés avant la v3). */
+export async function urisWithoutLyricsCheck(): Promise<Set<string>> {
+  const rows = await getDb().getAllAsync<{ uri: string }>('SELECT uri FROM tracks WHERE lyrics_checked = 0');
+  return new Set(rows.map((r) => r.uri));
+}
+
+/** Paroles trouvées au scan (null = aucune). */
+export async function setScannedLyrics(uri: string, lyrics: string | null): Promise<void> {
+  await getDb().runAsync('UPDATE tracks SET lyrics = ?, lyrics_checked = 1 WHERE uri = ?', lyrics, uri);
+}
+
+/** Paroles trouvées en ligne ou synchronisées à la main (null = les retirer). Un scan ne les écrase que si un nom.lrc existe. */
+export async function setTrackLyrics(id: number, lyrics: string | null): Promise<void> {
+  await getDb().runAsync('UPDATE tracks SET lyrics = ?, lyrics_checked = 1 WHERE id = ?', lyrics, id);
+}
+
+/** Paroles d'un morceau, chargées à la demande (pas dans Track pour garder les listes légères). */
+export async function trackLyrics(id: number): Promise<string | null> {
+  const r = await getDb().getFirstAsync<{ lyrics: string | null }>('SELECT lyrics FROM tracks WHERE id = ?', id);
+  return r?.lyrics ?? null;
+}
+
 export async function trackByUri(uri: string): Promise<Track | null> {
-  const r = await getDb().getFirstAsync<TrackRow>('SELECT * FROM tracks WHERE uri = ?', uri);
+  const r = await getDb().getFirstAsync<TrackRow>(`SELECT ${TRACK_COLS} FROM tracks WHERE uri = ?`, uri);
   return r ? toTrack(r) : null;
 }
 
@@ -135,20 +165,20 @@ export async function markPlayed(id: number): Promise<void> {
 }
 
 export async function likedTracks(): Promise<Track[]> {
-  const rows = await getDb().getAllAsync<TrackRow>(`SELECT * FROM tracks WHERE liked = 1 ${ORDER_BY_ALBUM}`);
+  const rows = await getDb().getAllAsync<TrackRow>(`SELECT ${TRACK_COLS} FROM tracks WHERE liked = 1 ${ORDER_BY_ALBUM}`);
   return rows.map(toTrack);
 }
 
 export async function recentTracks(limit = 20): Promise<Track[]> {
   const rows = await getDb().getAllAsync<TrackRow>(
-    'SELECT * FROM tracks WHERE last_played_at IS NOT NULL ORDER BY last_played_at DESC LIMIT ?',
+    `SELECT ${TRACK_COLS} FROM tracks WHERE last_played_at IS NOT NULL ORDER BY last_played_at DESC LIMIT ?`,
     limit,
   );
   return rows.map(toTrack);
 }
 
 export async function recentlyAdded(limit = 20): Promise<Track[]> {
-  const rows = await getDb().getAllAsync<TrackRow>('SELECT * FROM tracks ORDER BY added_at DESC, id DESC LIMIT ?', limit);
+  const rows = await getDb().getAllAsync<TrackRow>(`SELECT ${TRACK_COLS} FROM tracks ORDER BY added_at DESC, id DESC LIMIT ?`, limit);
   return rows.map(toTrack);
 }
 
@@ -170,7 +200,7 @@ export async function artists(): Promise<ArtistSummary[]> {
 
 export async function albumTracks(album: string): Promise<Track[]> {
   const rows = await getDb().getAllAsync<TrackRow>(
-    `SELECT * FROM tracks WHERE album = ? COLLATE NOCASE ORDER BY track_no, title COLLATE NOCASE`,
+    `SELECT ${TRACK_COLS} FROM tracks WHERE album = ? COLLATE NOCASE ORDER BY track_no, title COLLATE NOCASE`,
     album,
   );
   return rows.map(toTrack);
@@ -178,7 +208,7 @@ export async function albumTracks(album: string): Promise<Track[]> {
 
 export async function artistTracks(artist: string): Promise<Track[]> {
   const rows = await getDb().getAllAsync<TrackRow>(
-    `SELECT * FROM tracks WHERE artist = ? COLLATE NOCASE ${ORDER_BY_ALBUM}`,
+    `SELECT ${TRACK_COLS} FROM tracks WHERE artist = ? COLLATE NOCASE ${ORDER_BY_ALBUM}`,
     artist,
   );
   return rows.map(toTrack);
@@ -218,7 +248,7 @@ export async function deletePlaylist(id: number): Promise<void> {
 
 export async function playlistTracks(id: number): Promise<Track[]> {
   const rows = await getDb().getAllAsync<TrackRow>(
-    `SELECT t.* FROM playlist_tracks pt JOIN tracks t ON t.id = pt.track_id
+    `SELECT ${TRACK_COLS_T} FROM playlist_tracks pt JOIN tracks t ON t.id = pt.track_id
      WHERE pt.playlist_id = ? ORDER BY pt.position`,
     id,
   );

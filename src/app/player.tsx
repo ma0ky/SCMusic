@@ -1,4 +1,4 @@
-// Lecteur plein écran : position, volume, précédent/suivant, aléatoire, répétition, j'aime.
+// Lecteur plein écran : position, volume, précédent/suivant, aléatoire, répétition, j'aime, paroles.
 import { useAudioPlayerStatus } from 'expo-audio';
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -8,6 +8,7 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import { Cover } from '@/components/Cover';
 import { DetailHeader } from '@/components/Header';
 import { Icon } from '@/components/Icon';
+import { LyricsView } from '@/components/LyricsView';
 import { Background } from '@/components/Screen';
 import { SeekBar } from '@/components/SeekBar';
 import { EmptyState, formatTime, GlassCard, IconButton, Txt } from '@/components/ui';
@@ -39,6 +40,7 @@ export default function Player() {
   const status = useAudioPlayerStatus(getPlayer());
   const s = usePlayerStore();
   const [preview, setPreview] = useState<number | null>(null);
+  const [showLyrics, setShowLyrics] = useState(false);
 
   if (!track) {
     return (
@@ -60,10 +62,24 @@ export default function Player() {
         title="En lecture"
         subtitle={`${s.queue.index + 1} / ${s.queue.order.length}`}
         icon="down"
-        right={<IconButton name="queue" label="File d'attente" onPress={() => router.push('/queue')} />}
+        right={
+          <>
+            <IconButton
+              name="lyrics"
+              label={showLyrics ? 'Masquer les paroles' : 'Afficher les paroles'}
+              active={showLyrics}
+              onPress={() => setShowLyrics(!showLyrics)}
+            />
+            <IconButton name="queue" label="File d'attente" onPress={() => router.push('/queue')} />
+          </>
+        }
       />
       <View style={styles.body}>
-        <Artwork seed={`${track.title}${track.artist}`} coverUri={track.coverUri} />
+        {showLyrics ? (
+          <LyricsView track={track} position={status.currentTime} onSeek={s.seek} style={styles.lyrics} />
+        ) : (
+          <Artwork seed={`${track.title}${track.artist}`} coverUri={track.coverUri} />
+        )}
 
         <View style={styles.titleRow}>
           <View style={{ flex: 1 }}>
@@ -110,6 +126,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   body: { flex: 1, paddingHorizontal: layout.gutter + space.sm, justifyContent: 'space-evenly' },
   art: { width: '100%', aspectRatio: 1, maxHeight: 340, alignSelf: 'center' },
+  lyrics: { flex: 1, marginVertical: space.md },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   times: { flexDirection: 'row', justifyContent: 'space-between' },
   controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

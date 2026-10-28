@@ -14,10 +14,16 @@ export function PageTitle({ title, right }: { title: string; right?: ReactNode }
   );
 }
 
-export function DetailHeader({ title, subtitle, right, icon = 'back' }: { title: string; subtitle?: string; right?: ReactNode; icon?: 'back' | 'down' }) {
+export function DetailHeader({ title, subtitle, right, icon = 'back', onBack }: {
+  title: string;
+  subtitle?: string;
+  right?: ReactNode;
+  icon?: 'back' | 'down';
+  onBack?: () => void; // par défaut : écran précédent
+}) {
   return (
     <View style={styles.detail}>
-      <IconButton name={icon} label="Retour" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
+      <IconButton name={icon} label="Retour" onPress={onBack ?? (() => (router.canGoBack() ? router.back() : router.replace('/')))} />
       <View style={{ flex: 1 }}>
         <Txt variant="heading" numberOfLines={1}>{title}</Txt>
         {subtitle ? <Txt variant="muted" numberOfLines={1}>{subtitle}</Txt> : null}

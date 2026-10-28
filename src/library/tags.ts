@@ -1,6 +1,7 @@
 // Lecture des tags d'un fichier audio (ID3v2 pour le MP3, Vorbis Comment pour le FLAC).
 // Fonctions pures sur des octets : le scanner lit le début du fichier et nous le passe.
-// On lit les métadonnées texte et la pochette intégrée (APIC en ID3, PICTURE en FLAC).
+// On lit les métadonnées texte, la pochette intégrée (APIC en ID3, PICTURE en FLAC)
+// et les paroles intégrées (USLT en ID3, LYRICS en FLAC).
 
 export interface EmbeddedPicture {
   mime: string; // image/jpeg ou image/png
@@ -14,6 +15,7 @@ export interface ParsedTags {
   trackNo?: number;
   duration?: number; // secondes (connue pour le FLAC grâce au bloc STREAMINFO)
   picture?: EmbeddedPicture;
+  lyrics?: string; // texte brut, éventuellement au format LRC
 }
 
 /** Nettoie une valeur de tag : caractères nuls, espaces multiples, valeurs vides. */
@@ -125,6 +127,16 @@ function terminatedLength(b: Uint8Array, from: number, wide: boolean): number {
   return b.length - from;
 }
 
+/** Frame USLT (v2.3/2.4) ou ULT (v2.2) : encodage, langue, description, puis le texte. */
+function parseUslt(frame: Uint8Array): string | undefined {
+  const encoding = frame[0];
+  if (frame.length < 5) return undefined;
+  let pos = 4; // encodage + langue sur 3 octets
+  pos += terminatedLength(frame, pos, encoding === 1 || encoding === 2); // description
+  const text = Uint8Array.of(encoding, ...frame.subarray(pos));
+  return decodeId3Text(text).replace(/\u0000/g, '').trim() || undefined;
+}
+
 /** Frame APIC (v2.3/2.4) ou PIC (v2.2) → image + type d'image. */
 function parseApic(frame: Uint8Array, v22: boolean): { type: number; picture: EmbeddedPicture } | null {
   const encoding = frame[0];
@@ -155,6 +167,7 @@ export function parseId3(bytes: Uint8Array): ParsedTags {
   const end = Math.min(total, bytes.length);
   const raw: Record<string, string> = {};
   let picture: { type: number; picture: EmbeddedPicture } | null = null;
+  let lyrics: string | undefined;
 
   let pos = 10;
   if (version >= 3 && bytes[5] & 0x40) {
@@ -174,6 +187,7 @@ export function parseId3(bytes: Uint8Array): ParsedTags {
     if (size <= 0 || dataStart + size > end) break;
     const key = ID3_FRAMES[id];
     if (key && !(key in raw)) raw[key] = decodeId3Text(bytes.subarray(dataStart, dataStart + size));
+    if ((id === 'USLT' || id === 'ULT') && !lyrics) lyrics = parseUslt(bytes.subarray(dataStart, dataStart + size));
     if ((id === 'APIC' || id === 'PIC') && picture?.type !== FRONT_COVER) {
       const found = parseApic(bytes.subarray(dataStart, dataStart + size), version === 2);
       if (found && (!picture || found.type === FRONT_COVER)) picture = found;
@@ -186,6 +200,7 @@ export function parseId3(bytes: Uint8Array): ParsedTags {
     album: cleanTag(raw.album),
     trackNo: parseTrackNo(cleanTag(raw.trackNo)),
     picture: picture?.picture,
+    lyrics,
   };
 }
 
@@ -233,6 +248,7 @@ export function parseFlac(bytes: Uint8Array): ParsedTags {
         else if (k === 'ARTIST') result.artist ??= cleanTag(v);
         else if (k === 'ALBUM') result.album ??= cleanTag(v);
         else if (k === 'TRACKNUMBER') result.trackNo ??= parseTrackNo(v);
+        else if (k === 'LYRICS' || k === 'UNSYNCEDLYRICS') result.lyrics ??= v.trim() || undefined;
       }
     } else if (type === 6 && pictureType !== FRONT_COVER) {
       // PICTURE : type, mime, description, dimensions, puis les octets de l'image
@@ -266,5 +282,6 @@ export function parseTags(bytes: Uint8Array, filename: string): Required<Pick<Pa
     trackNo: fromFile.trackNo ?? fromName.trackNo,
     duration: fromFile.duration,
     picture: fromFile.picture,
+    lyrics: fromFile.lyrics,
   };
 }

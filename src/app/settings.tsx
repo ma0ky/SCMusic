@@ -54,7 +54,7 @@ export default function Settings() {
     run('Analyse du dossier…', async () => {
       const r = await scanLibrary(uri, (p) => setBusy(`Analyse : ${p.done} / ${p.total}`));
       libraryChanged();
-      Alert.alert('Bibliothèque à jour', `${r.added} ajouté(s), ${r.removed} retiré(s), ${r.covers} pochette(s) trouvée(s)${r.failed ? `, ${r.failed} illisible(s)` : ''}.`);
+      Alert.alert('Bibliothèque à jour', `${r.added} ajouté(s), ${r.removed} retiré(s), ${r.covers} pochette(s), ${r.lyrics} parole(s) trouvée(s)${r.failed ? `, ${r.failed} illisible(s)` : ''}.`);
     });
 
   const choose = () =>

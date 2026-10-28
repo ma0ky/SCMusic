@@ -2,7 +2,7 @@
   "expo": {
     "name": "SCMusic",
     "slug": "scmusic",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -17,6 +17,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "org.scmusic.app",
+      "versionCode": 2,
       "blockedPermissions": [
         "android.permission.SYSTEM_ALERT_WINDOW"
       ]
