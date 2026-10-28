@@ -33,7 +33,8 @@
         }
       ],
       "expo-sqlite",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-asset"
     ],
     "scheme": "scmusic",
     "experiments": {
