@@ -12,16 +12,26 @@ Il lit les MP3 et FLAC que tu possèdes, sans compte, sans serveur, sans publici
 - **Recherche** : titres, artistes et albums (accents et majuscules ignorés)
 - **Partage** : export / import de playlists entre deux téléphones, dans le respect du droit d'auteur (voir plus bas)
 
-## Lancer l'app sur ton téléphone (développement)
+## Compiler et installer (100 % local, sans store ni cloud)
 
-Prérequis : Node.js 20+ sur le PC, l'app **Expo Go** sur le téléphone (Play Store), PC et téléphone sur le même Wi-Fi.
+Prérequis sur le PC : Node.js 20+, Java 21, le SDK Android en ligne de commande dans `~/Android/Sdk`
+(`platforms;android-37.0`, `build-tools;37.0.0`, `platform-tools`, `ndk;27.1.12297006`) et :
 
 ```bash
-npm install        # installe les dépendances (une seule fois)
-npm start          # lance le serveur de développement et affiche un QR code
+export ANDROID_HOME=$HOME/Android/Sdk
+export EXPO_NO_TELEMETRY=1
 ```
 
-Scanne le QR code avec Expo Go. À chaque modification du code, l'app se recharge toute seule.
+Sur le téléphone : Options développeur → Débogage USB, puis branche-le en USB.
+
+```bash
+npm install          # dépendances (une seule fois)
+npm run apk          # compile l'APK (arm64) : android/app/build/outputs/apk/release/app-release.apk
+npm run apk:install  # installe / met à jour l'app via USB, en gardant tes données
+```
+
+L'APK ne contient aucun service Google (pas de Play Services, pas de Firebase).
+Il est signé avec une clé de développement locale : suffisant pour un usage perso.
 
 ## Commandes utiles
 
@@ -31,11 +41,6 @@ Scanne le QR code avec Expo Go. À chaque modification du code, l'app se recharg
 | `npm run typecheck` | vérifie les types TypeScript |
 | `npx eslint .` | vérifie le style et les erreurs courantes |
 | `npx expo-doctor` | diagnostique la configuration Expo |
-
-## Construire l'APK
-
-- **Dans le cloud (le plus simple)** : `npx eas-cli@latest build -p android --profile preview` (compte Expo gratuit requis). Docs : https://docs.expo.dev/build-reference/apk/
-- **En local** : installe Android Studio (SDK Android), puis `npx expo run:android --variant release`.
 
 ## Partage et droit d'auteur
 
