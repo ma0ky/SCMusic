@@ -11,10 +11,9 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#14112b",
+        "backgroundColor": "#030414",
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundImage": "./assets/android-icon-background.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "org.scmusic.app",
