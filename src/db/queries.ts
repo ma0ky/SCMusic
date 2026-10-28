@@ -46,6 +46,16 @@ export async function allTracks(): Promise<Track[]> {
   return rows.map(toTrack);
 }
 
+/** Morceaux par identifiant (ordre quelconque) : sert à rafraîchir la file d'attente. */
+export async function tracksByIds(ids: number[]): Promise<Track[]> {
+  if (!ids.length) return [];
+  const rows = await getDb().getAllAsync<TrackRow>(
+    `SELECT ${TRACK_COLS} FROM tracks WHERE id IN (${ids.map(() => '?').join(', ')})`,
+    ...ids,
+  );
+  return rows.map(toTrack);
+}
+
 export async function knownUris(): Promise<Set<string>> {
   const rows = await getDb().getAllAsync<{ uri: string }>('SELECT uri FROM tracks');
   return new Set(rows.map((r) => r.uri));

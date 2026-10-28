@@ -4,7 +4,7 @@ import { create } from 'zustand';
 import * as Q from '@/player/queue';
 import * as engine from '@/player/engine';
 import * as tracker from '@/stats/tracker';
-import { markPlayed, setAlbumCover, setDuration, setLicense, setLiked, setTrackCover } from '@/db/queries';
+import { markPlayed, setAlbumCover, setDuration, setLicense, setLiked, setTrackCover, tracksByIds } from '@/db/queries';
 import type { Track, TrackLicense } from '@/db/types';
 
 /** "Précédent" revient au début du morceau s'il joue depuis plus de 3 s. */
@@ -62,6 +62,27 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     set({ queue: { ...q, order: fix(q.order), original: fix(q.original) } });
   };
   const patchTrack = (id: number, patch: Partial<Track>) => patchWhere((t) => t.id === id, patch);
+
+  /**
+   * La file garde une copie des morceaux : après un scan (nouvelle pochette, titre corrigé…),
+   * on relit ces morceaux dans la base pour que le lecteur et l'écran verrouillé soient à jour.
+   */
+  const refreshQueue = async () => {
+    const ids = [...new Set(get().queue.original.map((e) => e.item.id))];
+    const fresh = new Map((await tracksByIds(ids)).map((t) => [t.id, t]));
+    const before = Q.current(get().queue);
+    const q = get().queue;
+    const fix = (list: Q.QueueEntry<Track>[]) =>
+      list.map((e) => {
+        const t = fresh.get(e.item.id);
+        return t ? { ...e, item: { ...t, duration: t.duration ?? e.item.duration } } : e;
+      });
+    set({ queue: { ...q, order: fix(q.order), original: fix(q.original) } });
+    const after = Q.current(get().queue);
+    if (after && before && (after.coverUri !== before.coverUri || after.title !== before.title || after.artist !== before.artist)) {
+      engine.refreshLockScreen(after);
+    }
+  };
 
   // Fin naturelle d'un morceau → suivant (ou rejouer si repeat "one").
   engine.onStatus((status) => {
@@ -154,7 +175,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       get().libraryChanged();
     },
 
-    libraryChanged: () => set({ libraryVersion: get().libraryVersion + 1 }),
+    libraryChanged: () => {
+      set({ libraryVersion: get().libraryVersion + 1 });
+      refreshQueue().catch((e) => console.warn('File d’attente :', e));
+    },
   };
 });
 
