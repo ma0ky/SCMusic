@@ -39,3 +39,9 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Musique et exports (ne jamais versionner de fichiers audio)
+*.mp3
+*.flac
+.env
+.env*
