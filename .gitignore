@@ -45,3 +45,8 @@ yarn-error.*
 *.flac
 .env
 .env*
+
+# APK signés (publiés via les releases GitHub, pas dans git)
+dist/
+*.jks
+*.keystore

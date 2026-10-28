@@ -42,7 +42,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
     "apk": "expo prebuild -p android --no-install && cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a",
-    "apk:install": "adb -d install -r android/app/build/outputs/apk/release/app-release.apk"
+    "apk:install": "adb -d install -r dist/SCMusic-$(node -p \"require('./app.json').expo.version\").apk",
+    "apk:sign": "bash scripts/sign-apk.sh"
   },
   "private": true,
   "license": "GPL-3.0-or-later",
