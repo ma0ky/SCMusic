@@ -14,6 +14,7 @@ Il ne se connecte à Internet que pour deux choses : chercher des paroles quand 
   - **Chercher en ligne** : interroge [LRCLIB](https://lrclib.net) (libre, sans compte) **uniquement quand tu appuies** ; seuls le titre et l'artiste sont envoyés
   - **Coller / écrire** le texte copié depuis un site, puis **Synchroniser au doigt** : la musique joue, tu touches « Ligne suivante » au début de chaque ligne
   - ou un fichier `nom.lrc` à côté de `nom.mp3`, ou les paroles intégrées au fichier (USLT / LYRICS), lus à l'analyse
+- **Statistiques** (bouton graphique de l'accueil) : temps d'écoute, nombre d'écoutes, titres / artistes / albums les plus écoutés sur 7 jours, 30 jours, 12 mois ou depuis toujours, graphique par jour ou par mois, titres à redécouvrir et jamais écoutés. Un titre compte après 30 s d'écoute réelle (les sauts ne comptent pas). Tout est calculé sur le téléphone
 - **Recherche** : titres, artistes et albums (accents et majuscules ignorés)
 - **Partage** : export / import de playlists entre deux téléphones, dans le respect du droit d'auteur (voir plus bas)
 
@@ -94,8 +95,7 @@ __tests__/        tests Jest
 
 ## Feuille de route
 
-- **Phase 2** : thème clair / sombre
-- **Phase 3** : statistiques d'écoute
+- Thème clair / sombre
 
 ## Licence
 

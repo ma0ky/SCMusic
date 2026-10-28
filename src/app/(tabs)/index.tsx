@@ -1,4 +1,4 @@
-// Accueil : écoutés récemment, ajoutés récemment, accès aux titres aimés.
+// Accueil : écoutés récemment, ajoutés récemment, accès aux titres aimés et aux statistiques.
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -45,7 +45,12 @@ export default function Home() {
     <Screen>
       <PageTitle
         title="SCMusic"
-        right={<IconButton name="settings" label="Réglages" onPress={() => router.push('/settings')} />}
+        right={
+          <>
+            <IconButton name="stats" label="Statistiques d'écoute" onPress={() => router.push('/stats')} />
+            <IconButton name="settings" label="Réglages" onPress={() => router.push('/settings')} />
+          </>
+        }
       />
       <ScrollView contentContainerStyle={{ paddingHorizontal: layout.gutter, paddingBottom: layout.contentBottom }}>
         {!loading && data.added.length === 0 ? (

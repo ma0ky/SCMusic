@@ -1,8 +1,9 @@
 // État global du lecteur (Zustand) : file d'attente + actions appelées par les écrans.
-// La logique de file vient de player/queue.ts, le son de player/engine.ts.
+// La logique de file vient de player/queue.ts, le son de player/engine.ts, les statistiques de stats/tracker.ts.
 import { create } from 'zustand';
 import * as Q from '@/player/queue';
 import * as engine from '@/player/engine';
+import * as tracker from '@/stats/tracker';
 import { markPlayed, setAlbumCover, setDuration, setLicense, setLiked, setTrackCover } from '@/db/queries';
 import type { Track, TrackLicense } from '@/db/types';
 
@@ -42,10 +43,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     const after = queue.order[queue.index];
     set({ queue });
     if (!after) {
+      tracker.endListening();
       engine.stop();
       return;
     }
     if (after.uid !== before || opts.forceReload) {
+      tracker.startListening(after.item);
       engine.loadAndPlay(after.item, opts.autoplay ?? true);
       markPlayed(after.item.id).catch(() => {});
     }
@@ -62,12 +65,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
 
   // Fin naturelle d'un morceau → suivant (ou rejouer si repeat "one").
   engine.onStatus((status) => {
+    tracker.onListeningStatus(status);
     const playing = Q.current(get().queue);
     if (playing && status.isLoaded && status.duration > 0 && playing.duration == null) {
       setDuration(playing.id, status.duration).catch(() => {});
       patchTrack(playing.id, { duration: status.duration });
     }
     if (!status.didJustFinish) return;
+    tracker.endListening();
     const { state, ended } = Q.next(get().queue, true);
     if (ended) {
       engine.getPlayer().seekTo(0).catch(() => {});

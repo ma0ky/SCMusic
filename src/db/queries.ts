@@ -271,6 +271,117 @@ export async function addToPlaylist(id: number, trackIds: number[]): Promise<voi
   await setPlaylistTracks(id, [...current, ...trackIds]);
 }
 
+// ---------- Statistiques d'écoute ----------
+
+export async function insertPlay(trackId: number, startedAt: number, listened: number, completed: boolean): Promise<number> {
+  const res = await getDb().runAsync(
+    'INSERT INTO plays (track_id, started_at, listened, completed) VALUES (?, ?, ?, ?)',
+    trackId, startedAt, listened, completed ? 1 : 0,
+  );
+  return res.lastInsertRowId;
+}
+
+export async function updatePlay(id: number, listened: number, completed: boolean): Promise<void> {
+  await getDb().runAsync('UPDATE plays SET listened = ?, completed = ? WHERE id = ?', listened, completed ? 1 : 0, id);
+}
+
+export interface ListeningTotals {
+  plays: number;
+  seconds: number;
+  tracks: number;
+  artists: number;
+  firstPlay: number | null; // ms, toutes périodes confondues
+}
+
+export async function listeningTotals(since: number): Promise<ListeningTotals> {
+  const r = await getDb().getFirstAsync<Omit<ListeningTotals, 'firstPlay'>>(
+    `SELECT COUNT(*) AS plays, COALESCE(SUM(p.listened), 0) AS seconds,
+       COUNT(DISTINCT p.track_id) AS tracks, COUNT(DISTINCT lower(t.artist)) AS artists
+     FROM plays p JOIN tracks t ON t.id = p.track_id WHERE p.started_at >= ?`,
+    since,
+  );
+  const first = await getDb().getFirstAsync<{ first: number | null }>('SELECT MIN(started_at) AS first FROM plays');
+  return { plays: r?.plays ?? 0, seconds: r?.seconds ?? 0, tracks: r?.tracks ?? 0, artists: r?.artists ?? 0, firstPlay: first?.first ?? null };
+}
+
+/** Temps écouté par jour ("2026-10-28") ou par mois ("2026-10"), en heure locale. */
+export async function listeningByPeriod(since: number, unit: 'day' | 'month'): Promise<{ key: string; seconds: number }[]> {
+  const format = unit === 'day' ? '%Y-%m-%d' : '%Y-%m';
+  return getDb().getAllAsync<{ key: string; seconds: number }>(
+    `SELECT strftime('${format}', started_at / 1000, 'unixepoch', 'localtime') AS key, SUM(listened) AS seconds
+     FROM plays WHERE started_at >= ? GROUP BY key`,
+    since,
+  );
+}
+
+export interface TopTrack {
+  track: Track;
+  plays: number;
+  seconds: number;
+}
+
+type TopTrackRow = TrackRow & { plays: number; seconds: number; last_play: number };
+
+export async function topTracks(since: number, limit = 5): Promise<TopTrack[]> {
+  const rows = await getDb().getAllAsync<TopTrackRow>(
+    `SELECT ${TRACK_COLS_T}, COUNT(*) AS plays, SUM(p.listened) AS seconds
+     FROM plays p JOIN tracks t ON t.id = p.track_id WHERE p.started_at >= ?
+     GROUP BY t.id ORDER BY plays DESC, seconds DESC LIMIT ?`,
+    since, limit,
+  );
+  return rows.map((r) => ({ track: toTrack(r), plays: r.plays, seconds: r.seconds }));
+}
+
+export interface TopGroup {
+  name: string;
+  artist: string;
+  coverUri: string | null;
+  plays: number;
+  seconds: number;
+}
+
+export async function topArtists(since: number, limit = 5): Promise<TopGroup[]> {
+  return getDb().getAllAsync<TopGroup>(
+    `SELECT MIN(t.artist) AS name, MIN(t.artist) AS artist, MAX(t.cover_uri) AS coverUri, COUNT(*) AS plays, SUM(p.listened) AS seconds
+     FROM plays p JOIN tracks t ON t.id = p.track_id WHERE p.started_at >= ?
+     GROUP BY lower(t.artist) ORDER BY plays DESC, seconds DESC LIMIT ?`,
+    since, limit,
+  );
+}
+
+export async function topAlbums(since: number, limit = 5): Promise<TopGroup[]> {
+  return getDb().getAllAsync<TopGroup>(
+    `SELECT MIN(t.album) AS name, MIN(t.artist) AS artist, MAX(t.cover_uri) AS coverUri, COUNT(*) AS plays, SUM(p.listened) AS seconds
+     FROM plays p JOIN tracks t ON t.id = p.track_id WHERE p.started_at >= ?
+     GROUP BY lower(t.album) ORDER BY plays DESC, seconds DESC LIMIT ?`,
+    since, limit,
+  );
+}
+
+/** Titres souvent écoutés (3 fois ou plus) mais plus depuis `before` : à redécouvrir. */
+export async function forgottenTracks(before: number, limit = 5): Promise<TopTrack[]> {
+  const rows = await getDb().getAllAsync<TopTrackRow>(
+    `SELECT ${TRACK_COLS_T}, COUNT(*) AS plays, SUM(p.listened) AS seconds, MAX(p.started_at) AS last_play
+     FROM plays p JOIN tracks t ON t.id = p.track_id
+     GROUP BY t.id HAVING plays >= 3 AND last_play < ? ORDER BY plays DESC LIMIT ?`,
+    before, limit,
+  );
+  return rows.map((r) => ({ track: toTrack(r), plays: r.plays, seconds: r.seconds }));
+}
+
+/** Titres de la bibliothèque jamais écoutés (au moins 30 s). */
+export async function neverPlayedTracks(): Promise<Track[]> {
+  const rows = await getDb().getAllAsync<TrackRow>(
+    `SELECT ${TRACK_COLS} FROM tracks WHERE NOT EXISTS (SELECT 1 FROM plays WHERE plays.track_id = tracks.id) ORDER BY added_at DESC`,
+  );
+  return rows.map(toTrack);
+}
+
+/** Efface tout l'historique d'écoute (les titres et playlists restent). */
+export async function clearPlays(): Promise<void> {
+  await getDb().runAsync('DELETE FROM plays');
+}
+
 // ---------- Réglages ----------
 
 export async function getSetting(key: string): Promise<string | null> {

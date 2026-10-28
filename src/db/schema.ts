@@ -60,6 +60,18 @@ const MIGRATIONS: string[] = [
   ALTER TABLE tracks ADD COLUMN lyrics TEXT;
   ALTER TABLE tracks ADD COLUMN lyrics_checked INTEGER NOT NULL DEFAULT 0;
   `,
+  // v4 : statistiques. Une ligne par écoute ayant duré au moins 30 s ; listened = secondes réellement écoutées.
+  `
+  CREATE TABLE IF NOT EXISTS plays (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    track_id   INTEGER NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
+    started_at INTEGER NOT NULL,
+    listened   REAL NOT NULL DEFAULT 0,
+    completed  INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX IF NOT EXISTS idx_plays_started ON plays(started_at);
+  CREATE INDEX IF NOT EXISTS idx_plays_track ON plays(track_id);
+  `,
 ];
 
 export async function migrate(): Promise<void> {
