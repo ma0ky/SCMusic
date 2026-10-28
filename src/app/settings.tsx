@@ -1,4 +1,4 @@
-// Réglages : dossier musique + scan, export / import pour partager avec un autre utilisateur.
+// Réglages : dossier musique + scan, export / import pour partager avec un autre utilisateur, mises à jour.
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +14,8 @@ import { importFromFolder, importFromJsonFile, type ImportResult } from '@/shari
 import { useLibrary } from '@/store/useLibrary';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { colors, layout, radius, space } from '@/theme/tokens';
+import { currentVersion, getAutoCheck, setAutoCheck } from '@/update/updater';
+import { UpdateProgress, useUpdater } from '@/update/useUpdater';
 
 /** Affiche un chemin SAF lisible : "content://…/tree/primary%3AMusic" → "Music". */
 function readableDir(uri: string | null): string {
@@ -34,8 +36,11 @@ export default function Settings() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [withAudio, setWithAudio] = useState(false);
   const { data: lists } = useLibrary(loadPlaylists, [] as Playlist[]);
+  const updater = useUpdater();
+  const [autoUpdate, setAutoUpdate] = useState(true);
 
   useEffect(() => { getMusicDirUri().then(setDir); }, []);
+  useEffect(() => { getAutoCheck().then(setAutoUpdate); }, []);
 
   /** Exécute une action longue en affichant son état et en attrapant les erreurs. */
   const run = async (label: string, action: () => Promise<void>) => {
@@ -154,9 +159,28 @@ export default function Settings() {
           <Txt variant="muted">Les titres d’une playlist reçue sont retrouvés dans ta bibliothèque par titre et artiste.</Txt>
         </GlassCard>
 
+        <SectionTitle>Mises à jour</SectionTitle>
+        <GlassCard style={styles.card}>
+          <Txt>Version installée : {currentVersion()}</Txt>
+          <Button title="Vérifier les mises à jour" icon="down" onPress={() => run('Vérification…', () => updater.check(true))} disabled={!!busy || updater.progress != null} />
+          <View style={styles.switchRow}>
+            <View style={{ flex: 1 }}>
+              <Txt>Vérifier à l’ouverture</Txt>
+              <Txt variant="muted">Au plus une fois par jour, une requête à GitHub (dépôt public SCMusic-releases). Aucune donnée personnelle envoyée.</Txt>
+            </View>
+            <Switch
+              value={autoUpdate}
+              onValueChange={(on) => { setAutoUpdate(on); setAutoCheck(on); }}
+              trackColor={{ true: colors.accent, false: colors.glassStrong }}
+              thumbColor={colors.text}
+            />
+          </View>
+        </GlassCard>
+
         <SectionTitle>À propos</SectionTitle>
-        <Txt variant="muted">SCMusic, logiciel libre sous licence GPL-3.0. Aucune donnée ne quitte ton téléphone sans ton action.</Txt>
+        <Txt variant="muted">SCMusic, logiciel libre sous licence GPL-3.0. Tes fichiers et ta bibliothèque ne quittent jamais ton téléphone. Seules connexions : la recherche de paroles quand tu la demandes, et la vérification des mises à jour.</Txt>
       </ScrollView>
+      <UpdateProgress progress={updater.progress} />
     </View>
   );
 }

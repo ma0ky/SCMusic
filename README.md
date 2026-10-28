@@ -2,7 +2,7 @@
 
 Lecteur de musique **local, libre et open source** (GPL-3.0) pour Android, construit avec Expo / React Native.
 Il lit les MP3 et FLAC que tu possèdes, sans compte, sans serveur, sans publicité.
-La seule connexion à Internet est la recherche de paroles, et seulement quand tu la demandes.
+Il ne se connecte à Internet que pour deux choses : chercher des paroles quand tu le demandes, et vérifier les mises à jour (une fois par jour au plus, désactivable).
 
 ## Fonctionnalités (MVP)
 
@@ -37,6 +37,23 @@ npm run apk:install  # installe / met à jour l'app via USB, en gardant tes donn
 
 L'APK ne contient aucun service Google (pas de Play Services, pas de Firebase).
 Il est signé avec une clé de développement locale : suffisant pour un usage perso.
+
+## Mises à jour sans câble
+
+Les APK signés sont publiés sur le dépôt public [ma0ky/SCMusic-releases](https://github.com/ma0ky/SCMusic-releases) (le code reste privé).
+À l'ouverture, au plus une fois par jour, l'app regarde s'il existe une version plus récente et propose **Mettre à jour** :
+elle télécharge l'APK, vérifie son empreinte SHA-256, puis l'installateur d'Android demande de confirmer.
+La première fois, Android demande d'autoriser SCMusic à installer des applications. On peut aussi vérifier à la main, ou couper la vérification, dans **Réglages → Mises à jour**.
+
+Publier une nouvelle version :
+
+```bash
+# 1. augmenter "version" et "android.versionCode" dans app.json (et "version" dans package.json)
+npm run apk && npm run apk:sign
+npm run apk:publish -- "Ce qui change dans cette version"
+```
+
+Toujours signer avec la même clé (`~/.scmusic-keys`) : Android refuse une mise à jour signée avec une autre clé.
 
 ## Commandes utiles
 
