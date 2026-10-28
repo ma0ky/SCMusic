@@ -54,7 +54,7 @@ export default function Settings() {
     run('Analyse du dossier…', async () => {
       const r = await scanLibrary(uri, (p) => setBusy(`Analyse : ${p.done} / ${p.total}`));
       libraryChanged();
-      Alert.alert('Bibliothèque à jour', `${r.added} ajouté(s), ${r.removed} retiré(s)${r.failed ? `, ${r.failed} illisible(s)` : ''}.`);
+      Alert.alert('Bibliothèque à jour', `${r.added} ajouté(s), ${r.removed} retiré(s), ${r.covers} pochette(s) trouvée(s)${r.failed ? `, ${r.failed} illisible(s)` : ''}.`);
     });
 
   const choose = () =>
@@ -119,7 +119,7 @@ export default function Settings() {
           </View>
           <Button title={dir ? 'Changer de dossier' : 'Choisir mon dossier'} icon="folder" onPress={choose} disabled={!!busy} />
           {dir && <Button title="Rescanner" kind="ghost" onPress={() => scan(dir)} disabled={!!busy} />}
-          <Txt variant="muted">Formats lus : MP3 et FLAC. Les tags (titre, artiste, album) sont lus dans les fichiers.</Txt>
+          <Txt variant="muted">Formats lus : MP3 et FLAC. Les tags et la pochette intégrée sont lus dans les fichiers ; sinon une image cover.jpg ou folder.jpg du dossier est utilisée.</Txt>
         </GlassCard>
 
         <SectionTitle>Partager avec un autre utilisateur</SectionTitle>

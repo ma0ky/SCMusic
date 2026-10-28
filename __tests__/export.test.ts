@@ -3,7 +3,7 @@ import type { Track, TrackLicense } from '@/db/types';
 
 const t = (id: number, title: string, license: TrackLicense): Track => ({
   id, title, artist: 'Artiste', album: 'Album', uri: `content://${id}`, filename: `${id}.flac`,
-  trackNo: null, duration: null, license, liked: false, addedAt: 0,
+  trackNo: null, duration: null, license, liked: false, addedAt: 0, coverUri: null,
 });
 
 const bought = t(1, 'Acheté', 'personal');

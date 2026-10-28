@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { getPlayer } from '@/player/engine';
 import { useCurrentTrack, usePlayerStore } from '@/store/usePlayerStore';
 import { colors, layout, space } from '@/theme/tokens';
+import { Cover } from './Cover';
 import { GlassCard, IconButton, Txt } from './ui';
 
 export function MiniPlayer() {
@@ -18,6 +19,7 @@ export function MiniPlayer() {
   return (
     <GlassCard strong style={styles.card}>
       <Pressable style={styles.row} onPress={() => router.push('/player')} accessibilityLabel="Ouvrir le lecteur">
+        <Cover uri={track.coverUri} size={44} />
         <View style={styles.text}>
           <Txt numberOfLines={1}>{track.title}</Txt>
           <Txt variant="muted" numberOfLines={1}>{track.artist}</Txt>
@@ -34,7 +36,7 @@ export function MiniPlayer() {
 
 const styles = StyleSheet.create({
   card: { marginHorizontal: space.sm, marginBottom: space.xs },
-  row: { height: layout.miniPlayerHeight, flexDirection: 'row', alignItems: 'center', paddingLeft: space.lg, paddingRight: space.xs },
+  row: { height: layout.miniPlayerHeight, flexDirection: 'row', alignItems: 'center', gap: space.md, paddingLeft: space.sm + 2, paddingRight: space.xs },
   text: { flex: 1, gap: 2 },
   progress: { height: 2, backgroundColor: colors.glassBorder },
   progressFill: { height: '100%', backgroundColor: colors.accent },

@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import type { Track } from '@/db/types';
 import { useCurrentTrack } from '@/store/usePlayerStore';
 import { colors, layout, radius, space } from '@/theme/tokens';
+import { Cover } from './Cover';
 import { Icon } from './Icon';
 import { formatTime, IconButton, Txt } from './ui';
 
@@ -25,9 +26,7 @@ export function TrackRow({
       style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.glass }]}
       accessibilityLabel={`${track.title}, ${track.artist}`}
     >
-      <View style={[styles.badge, isCurrent && { backgroundColor: colors.accentSoft }]}>
-        <Icon name={isCurrent ? 'play' : 'disc'} size={16} color={isCurrent ? colors.accent : colors.textFaint} />
-      </View>
+      <Cover uri={track.coverUri} size={44} highlight={isCurrent} />
       <View style={styles.text}>
         <Txt numberOfLines={1} style={isCurrent && { color: colors.accent }}>{track.title}</Txt>
         <Txt variant="muted" numberOfLines={1}>
@@ -49,14 +48,6 @@ const styles = StyleSheet.create({
     gap: space.md,
     paddingHorizontal: space.sm,
     borderRadius: radius.md,
-  },
-  badge: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.sm,
-    backgroundColor: colors.glass,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   text: { flex: 1, gap: 2 },
 });

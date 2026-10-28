@@ -1,12 +1,14 @@
 // Feuilles modales : menu d'actions d'un morceau, saisie de texte, choix de playlist.
 // (Les Alert natives d'Android sont limitées à 3 boutons et sans champ texte.)
 import { useEffect, useState, type ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { addToPlaylist, createPlaylist, playlists as loadPlaylists } from '@/db/queries';
 import type { Playlist, Track, TrackLicense } from '@/db/types';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { colors, font, fontFamily, radius, space } from '@/theme/tokens';
+import { pickCoverImage } from '@/library/covers';
+import { Cover } from './Cover';
 import { Icon, type IconName } from './Icon';
 import { Button, GlassCard, Txt } from './ui';
 
@@ -91,14 +93,23 @@ export function TrackMenu({ track, ...rest }: TrackMenuProps) {
 }
 
 function TrackMenuBody({ track, onClose, extra }: TrackMenuProps & { track: Track }) {
-  const { playNext, enqueue, toggleLike, changeLicense, libraryChanged } = usePlayerStore.getState();
-  const [mode, setMode] = useState<'main' | 'playlist' | 'license' | 'newPlaylist'>('main');
+  const { playNext, enqueue, toggleLike, changeLicense, changeCover, libraryChanged } = usePlayerStore.getState();
+  const [mode, setMode] = useState<'main' | 'playlist' | 'license' | 'newPlaylist' | 'cover'>('main');
   const [lists, setLists] = useState<Playlist[]>([]);
 
   useEffect(() => { if (mode === 'playlist') loadPlaylists().then(setLists); }, [mode]);
 
   const done = () => { onClose(); setMode('main'); };
   const addTo = async (id: number) => { await addToPlaylist(id, [track.id]); libraryChanged(); done(); };
+  const chooseCover = async (wholeAlbum: boolean) => {
+    try {
+      const uri = await pickCoverImage();
+      if (uri) await changeCover(track, uri, wholeAlbum);
+      done();
+    } catch (e) {
+      Alert.alert('Image illisible', e instanceof Error ? e.message : String(e));
+    }
+  };
 
   if (mode === 'newPlaylist') {
     return (
@@ -127,6 +138,7 @@ function TrackMenuBody({ track, onClose, extra }: TrackMenuProps & { track: Trac
           />
           <SheetItem icon="disc" label="Voir l'album" onPress={() => { done(); router.push({ pathname: '/album/[id]', params: { id: track.album } }); }} />
           <SheetItem icon="user" label="Voir l'artiste" onPress={() => { done(); router.push({ pathname: '/artist/[id]', params: { id: track.artist } }); }} />
+          <SheetItem icon="image" label="Pochette" onPress={() => setMode('cover')} />
           <SheetItem icon="edit" label="Licence du morceau" onPress={() => setMode('license')} />
           {extra}
         </>
@@ -136,6 +148,18 @@ function TrackMenuBody({ track, onClose, extra }: TrackMenuProps & { track: Trac
           <SheetItem icon="plus" label="Nouvelle playlist…" active onPress={() => setMode('newPlaylist')} />
           {lists.map((p) => <SheetItem key={p.id} icon="playlist" label={p.name} onPress={() => addTo(p.id)} />)}
         </ScrollView>
+      )}
+      {mode === 'cover' && (
+        <>
+          <View style={{ alignItems: 'center', marginBottom: space.md }}>
+            <Cover uri={track.coverUri} size={120} rounded={radius.md} />
+          </View>
+          <SheetItem icon="image" label="Choisir une image pour ce titre" onPress={() => chooseCover(false)} />
+          <SheetItem icon="disc" label={`Choisir une image pour tout l'album « ${track.album} »`} onPress={() => chooseCover(true)} />
+          {track.coverUri && (
+            <SheetItem icon="trash" label="Retirer la pochette" danger onPress={() => { changeCover(track, null, false); done(); }} />
+          )}
+        </>
       )}
       {mode === 'license' && (
         <>

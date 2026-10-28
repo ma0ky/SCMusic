@@ -15,6 +15,7 @@ interface TrackRow {
   license: TrackLicense;
   liked: number;
   added_at: number;
+  cover_uri: string | null;
 }
 
 const toTrack = (r: TrackRow): Track => ({
@@ -29,6 +30,7 @@ const toTrack = (r: TrackRow): Track => ({
   license: r.license,
   liked: r.liked === 1,
   addedAt: r.added_at,
+  coverUri: r.cover_uri,
 });
 
 const ORDER_BY_ALBUM = 'ORDER BY artist COLLATE NOCASE, album COLLATE NOCASE, track_no, title COLLATE NOCASE';
@@ -54,16 +56,53 @@ export interface NewTrack {
   trackNo?: number;
   duration?: number;
   license?: TrackLicense;
+  coverUri?: string | null;
+  coverSource?: CoverSource | null;
 }
+
+export type CoverSource = 'tag' | 'folder' | 'manual';
 
 export async function insertTrack(t: NewTrack): Promise<number> {
   const res = await getDb().runAsync(
-    `INSERT INTO tracks (uri, filename, title, artist, album, track_no, duration, license, added_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO tracks (uri, filename, title, artist, album, track_no, duration, license, added_at, cover_uri, cover_source, cover_checked)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
      ON CONFLICT(uri) DO NOTHING`,
     t.uri, t.filename, t.title, t.artist, t.album, t.trackNo ?? null, t.duration ?? null, t.license ?? 'personal', Date.now(),
+    t.coverUri ?? null, t.coverSource ?? null,
   );
   return res.lastInsertRowId;
+}
+
+// ---------- Pochettes ----------
+
+/** URIs des morceaux jamais inspectés pour leur pochette (bibliothèque scannée avant la v2). */
+export async function urisWithoutCoverCheck(): Promise<Set<string>> {
+  const rows = await getDb().getAllAsync<{ uri: string }>('SELECT uri FROM tracks WHERE cover_checked = 0');
+  return new Set(rows.map((r) => r.uri));
+}
+
+/** Pochette trouvée au scan : ne remplace jamais une pochette choisie à la main. */
+export async function setScannedCover(uri: string, coverUri: string | null, source: CoverSource | null): Promise<void> {
+  await getDb().runAsync(
+    `UPDATE tracks SET cover_checked = 1,
+       cover_uri = CASE WHEN cover_source = 'manual' THEN cover_uri ELSE ? END,
+       cover_source = CASE WHEN cover_source = 'manual' THEN cover_source ELSE ? END
+     WHERE uri = ?`,
+    coverUri, source, uri,
+  );
+}
+
+/** Pochette choisie à la main pour un morceau (null = la retirer). */
+export async function setTrackCover(id: number, coverUri: string | null): Promise<void> {
+  await getDb().runAsync('UPDATE tracks SET cover_uri = ?, cover_source = ? WHERE id = ?', coverUri, coverUri ? 'manual' : null, id);
+}
+
+/** Pochette choisie à la main pour tous les titres d'un album. */
+export async function setAlbumCover(album: string, coverUri: string | null): Promise<void> {
+  await getDb().runAsync(
+    'UPDATE tracks SET cover_uri = ?, cover_source = ? WHERE album = ? COLLATE NOCASE',
+    coverUri, coverUri ? 'manual' : null, album,
+  );
 }
 
 export async function trackByUri(uri: string): Promise<Track | null> {
@@ -117,7 +156,7 @@ export async function recentlyAdded(limit = 20): Promise<Track[]> {
 
 export async function albums(): Promise<AlbumSummary[]> {
   return getDb().getAllAsync<AlbumSummary>(
-    `SELECT album, MIN(artist) AS artist, COUNT(*) AS trackCount
+    `SELECT album, MIN(artist) AS artist, COUNT(*) AS trackCount, MAX(cover_uri) AS coverUri
      FROM tracks GROUP BY album COLLATE NOCASE ORDER BY album COLLATE NOCASE`,
   );
 }

@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import * as Q from '@/player/queue';
 import * as engine from '@/player/engine';
-import { markPlayed, setDuration, setLicense, setLiked } from '@/db/queries';
+import { markPlayed, setAlbumCover, setDuration, setLicense, setLiked, setTrackCover } from '@/db/queries';
 import type { Track, TrackLicense } from '@/db/types';
 
 /** "Précédent" revient au début du morceau s'il joue depuis plus de 3 s. */
@@ -30,6 +30,8 @@ interface PlayerState {
   jumpTo: (index: number) => void;
   toggleLike: (t: Track) => Promise<void>;
   changeLicense: (t: Track, license: TrackLicense) => Promise<void>;
+  /** Change la pochette d'un morceau, ou de tout son album si `wholeAlbum`. null = retirer. */
+  changeCover: (t: Track, coverUri: string | null, wholeAlbum: boolean) => Promise<void>;
   libraryChanged: () => void;
 }
 
@@ -49,13 +51,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     }
   };
 
-  /** Met à jour un morceau partout dans la file (ex. après un "j'aime"). */
-  const patchTrack = (id: number, patch: Partial<Track>) => {
+  /** Met à jour les morceaux concernés partout dans la file (ex. après un "j'aime"). */
+  const patchWhere = (match: (t: Track) => boolean, patch: Partial<Track>) => {
     const q = get().queue;
     const fix = (list: Q.QueueEntry<Track>[]) =>
-      list.map((e) => (e.item.id === id ? { ...e, item: { ...e.item, ...patch } } : e));
+      list.map((e) => (match(e.item) ? { ...e, item: { ...e.item, ...patch } } : e));
     set({ queue: { ...q, order: fix(q.order), original: fix(q.original) } });
   };
+  const patchTrack = (id: number, patch: Partial<Track>) => patchWhere((t) => t.id === id, patch);
 
   // Fin naturelle d'un morceau → suivant (ou rejouer si repeat "one").
   engine.onStatus((status) => {
@@ -129,6 +132,20 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     changeLicense: async (t, license) => {
       await setLicense(t.id, license);
       patchTrack(t.id, { license });
+      get().libraryChanged();
+    },
+
+    changeCover: async (t, coverUri, wholeAlbum) => {
+      const sameAlbum = (x: Track) => x.album.toLowerCase() === t.album.toLowerCase();
+      if (wholeAlbum) {
+        await setAlbumCover(t.album, coverUri);
+        patchWhere(sameAlbum, { coverUri });
+      } else {
+        await setTrackCover(t.id, coverUri);
+        patchTrack(t.id, { coverUri });
+      }
+      const playing = Q.current(get().queue);
+      if (playing && (playing.id === t.id || (wholeAlbum && sameAlbum(playing)))) engine.refreshLockScreen(playing);
       get().libraryChanged();
     },
 

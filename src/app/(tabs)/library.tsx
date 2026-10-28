@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { PageTitle } from '@/components/Header';
+import { Cover } from '@/components/Cover';
 import { Icon } from '@/components/Icon';
 import { Screen } from '@/components/Screen';
 import { TrackList } from '@/components/TrackList';
@@ -35,12 +36,16 @@ function Segments({ value, onChange }: { value: Tab; onChange: (t: Tab) => void 
   );
 }
 
-function GroupRow({ icon, title, subtitle, onPress }: { icon: 'disc' | 'user'; title: string; subtitle: string; onPress: () => void }) {
+function GroupRow({ icon, title, subtitle, onPress, coverUri }: { icon: 'disc' | 'user'; title: string; subtitle: string; onPress: () => void; coverUri?: string | null }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.group, pressed && { backgroundColor: colors.glass }]}>
-      <View style={styles.groupIcon}>
-        <Icon name={icon} size={20} color={colors.accent} />
-      </View>
+      {coverUri ? (
+        <Cover uri={coverUri} size={48} />
+      ) : (
+        <View style={styles.groupIcon}>
+          <Icon name={icon} size={20} color={colors.accent} />
+        </View>
+      )}
       <View style={{ flex: 1 }}>
         <Txt numberOfLines={1}>{title}</Txt>
         <Txt variant="muted" numberOfLines={1}>{subtitle}</Txt>
@@ -78,7 +83,7 @@ export default function Library() {
           contentContainerStyle={listStyle}
           ListEmptyComponent={empty}
           renderItem={({ item }) => (
-            <GroupRow icon="disc" title={item.album} subtitle={`${item.artist} · ${plural(item.trackCount, 'titre')}`}
+            <GroupRow icon="disc" coverUri={item.coverUri} title={item.album} subtitle={`${item.artist} · ${plural(item.trackCount, 'titre')}`}
               onPress={() => router.push({ pathname: '/album/[id]', params: { id: item.album } })} />
           )}
         />
@@ -114,5 +119,5 @@ const styles = StyleSheet.create({
   segment: { flex: 1, alignItems: 'center', paddingVertical: space.sm, borderRadius: radius.sm },
   segmentOn: { backgroundColor: colors.accent },
   group: { flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: layout.rowHeight, paddingHorizontal: space.sm, borderRadius: radius.md },
-  groupIcon: { width: 40, height: 40, borderRadius: radius.sm, backgroundColor: colors.glass, alignItems: 'center', justifyContent: 'center' },
+  groupIcon: { width: 48, height: 48, borderRadius: radius.sm, backgroundColor: colors.glass, alignItems: 'center', justifyContent: 'center' },
 });

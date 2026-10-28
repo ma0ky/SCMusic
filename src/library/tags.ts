@@ -1,6 +1,11 @@
 // Lecture des tags d'un fichier audio (ID3v2 pour le MP3, Vorbis Comment pour le FLAC).
 // Fonctions pures sur des octets : le scanner lit le début du fichier et nous le passe.
-// On ne lit que des métadonnées texte, jamais d'image.
+// On lit les métadonnées texte et la pochette intégrée (APIC en ID3, PICTURE en FLAC).
+
+export interface EmbeddedPicture {
+  mime: string; // image/jpeg ou image/png
+  data: Uint8Array;
+}
 
 export interface ParsedTags {
   title?: string;
@@ -8,6 +13,7 @@ export interface ParsedTags {
   album?: string;
   trackNo?: number;
   duration?: number; // secondes (connue pour le FLAC grâce au bloc STREAMINFO)
+  picture?: EmbeddedPicture;
 }
 
 /** Nettoie une valeur de tag : caractères nuls, espaces multiples, valeurs vides. */
@@ -99,6 +105,47 @@ const ID3_FRAMES: Record<string, keyof ParsedTags> = {
   TT2: 'title', TP1: 'artist', TAL: 'album', TRK: 'trackNo', // v2.2
 };
 
+/** Type d'image "couverture avant" dans ID3 et FLAC. */
+const FRONT_COVER = 3;
+
+/** Devine le type d'image à partir de ses premiers octets (plus fiable que le tag). */
+export function sniffImageMime(data: Uint8Array, declared = ''): string {
+  if (data[0] === 0xff && data[1] === 0xd8) return 'image/jpeg';
+  if (data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4e && data[3] === 0x47) return 'image/png';
+  return declared.toLowerCase().includes('png') ? 'image/png' : 'image/jpeg';
+}
+
+/** Longueur d'une chaîne terminée par un octet nul (ou deux en UTF-16). */
+function terminatedLength(b: Uint8Array, from: number, wide: boolean): number {
+  if (!wide) {
+    const end = b.indexOf(0, from);
+    return end < 0 ? b.length - from : end - from + 1;
+  }
+  for (let i = from; i + 1 < b.length; i += 2) if (b[i] === 0 && b[i + 1] === 0) return i - from + 2;
+  return b.length - from;
+}
+
+/** Frame APIC (v2.3/2.4) ou PIC (v2.2) → image + type d'image. */
+function parseApic(frame: Uint8Array, v22: boolean): { type: number; picture: EmbeddedPicture } | null {
+  const encoding = frame[0];
+  let pos = 1;
+  let declared: string;
+  if (v22) {
+    declared = decodeLatin1(frame.subarray(1, 4)); // "JPG" ou "PNG"
+    pos = 4;
+  } else {
+    const len = terminatedLength(frame, pos, false);
+    declared = decodeLatin1(frame.subarray(pos, pos + len - 1));
+    pos += len;
+  }
+  const type = frame[pos];
+  pos += 1;
+  pos += terminatedLength(frame, pos, encoding === 1 || encoding === 2); // description
+  const data = frame.subarray(pos);
+  if (data.length < 64) return null;
+  return { type, picture: { mime: sniffImageMime(data, declared), data } };
+}
+
 export function parseId3(bytes: Uint8Array): ParsedTags {
   const total = id3TagSize(bytes);
   if (total === 0) return {};
@@ -107,6 +154,7 @@ export function parseId3(bytes: Uint8Array): ParsedTags {
   const headerLen = version === 2 ? 6 : 10;
   const end = Math.min(total, bytes.length);
   const raw: Record<string, string> = {};
+  let picture: { type: number; picture: EmbeddedPicture } | null = null;
 
   let pos = 10;
   if (version >= 3 && bytes[5] & 0x40) {
@@ -126,6 +174,10 @@ export function parseId3(bytes: Uint8Array): ParsedTags {
     if (size <= 0 || dataStart + size > end) break;
     const key = ID3_FRAMES[id];
     if (key && !(key in raw)) raw[key] = decodeId3Text(bytes.subarray(dataStart, dataStart + size));
+    if ((id === 'APIC' || id === 'PIC') && picture?.type !== FRONT_COVER) {
+      const found = parseApic(bytes.subarray(dataStart, dataStart + size), version === 2);
+      if (found && (!picture || found.type === FRONT_COVER)) picture = found;
+    }
     pos = dataStart + size;
   }
   return {
@@ -133,6 +185,7 @@ export function parseId3(bytes: Uint8Array): ParsedTags {
     artist: cleanTag(raw.artist),
     album: cleanTag(raw.album),
     trackNo: parseTrackNo(cleanTag(raw.trackNo)),
+    picture: picture?.picture,
   };
 }
 
@@ -145,6 +198,7 @@ function uint32le(b: Uint8Array, at: number): number {
 export function parseFlac(bytes: Uint8Array): ParsedTags {
   if (decodeLatin1(bytes.subarray(0, 4)) !== 'fLaC') return {};
   const result: ParsedTags = {};
+  let pictureType = -1;
   let pos = 4;
   let last = false;
   while (!last && pos + 4 <= bytes.length) {
@@ -180,6 +234,21 @@ export function parseFlac(bytes: Uint8Array): ParsedTags {
         else if (k === 'ALBUM') result.album ??= cleanTag(v);
         else if (k === 'TRACKNUMBER') result.trackNo ??= parseTrackNo(v);
       }
+    } else if (type === 6 && pictureType !== FRONT_COVER) {
+      // PICTURE : type, mime, description, dimensions, puis les octets de l'image
+      const picType = uint32(block, 0);
+      let p = 4;
+      const mimeLen = uint32(block, p);
+      const declared = decodeLatin1(block.subarray(p + 4, p + 4 + mimeLen));
+      p += 4 + mimeLen;
+      p += 4 + uint32(block, p); // description
+      p += 16; // largeur, hauteur, profondeur, couleurs
+      const dataLen = uint32(block, p);
+      const data = block.subarray(p + 4, p + 4 + dataLen);
+      if (data.length >= 64 && (pictureType < 0 || picType === FRONT_COVER)) {
+        pictureType = picType;
+        result.picture = { mime: sniffImageMime(data, declared), data };
+      }
     }
     pos = start + len;
   }
@@ -196,5 +265,6 @@ export function parseTags(bytes: Uint8Array, filename: string): Required<Pick<Pa
     album: fromFile.album ?? 'Album inconnu',
     trackNo: fromFile.trackNo ?? fromName.trackNo,
     duration: fromFile.duration,
+    picture: fromFile.picture,
   };
 }

@@ -19,15 +19,34 @@ export function getPlayer(): AudioPlayer {
   return player;
 }
 
+/** Infos affichées sur l'écran verrouillé et dans la notification (avec la pochette). */
+function lockScreenMetadata(track: Track) {
+  return {
+    title: track.title,
+    artist: track.artist,
+    albumTitle: track.album,
+    artworkUrl: track.coverUri ?? undefined, // file:// lisible par le service de lecture
+  };
+}
+
 export function loadAndPlay(track: Track, autoplay = true): void {
   const p = getPlayer();
   p.replace({ uri: track.uri });
   try {
-    p.setActiveForLockScreen(true, { title: track.title, artist: track.artist, albumTitle: track.album });
+    p.setActiveForLockScreen(true, lockScreenMetadata(track));
   } catch {
-    // indisponible dans Expo Go sur certaines versions : la lecture fonctionne quand même
+    // contrôles écran verrouillé indisponibles : la lecture fonctionne quand même
   }
   if (autoplay) p.play();
+}
+
+/** Met à jour l'écran verrouillé sans relancer le morceau (ex. nouvelle pochette). */
+export function refreshLockScreen(track: Track): void {
+  try {
+    getPlayer().updateLockScreenMetadata(lockScreenMetadata(track));
+  } catch {
+    // voir loadAndPlay
+  }
 }
 
 export function stop(): void {

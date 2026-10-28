@@ -47,6 +47,13 @@ const MIGRATIONS: string[] = [
     value TEXT NOT NULL
   );
   `,
+  // v2 : pochettes. cover_source = 'tag' (intégrée), 'folder' (cover.jpg) ou 'manual' (choisie à la main).
+  // cover_checked = 1 quand le fichier a déjà été inspecté (évite de relire à chaque scan).
+  `
+  ALTER TABLE tracks ADD COLUMN cover_uri TEXT;
+  ALTER TABLE tracks ADD COLUMN cover_source TEXT;
+  ALTER TABLE tracks ADD COLUMN cover_checked INTEGER NOT NULL DEFAULT 0;
+  `,
 ];
 
 export async function migrate(): Promise<void> {

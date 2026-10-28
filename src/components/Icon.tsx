@@ -73,6 +73,13 @@ const shapes = {
     </>
   ),
   user: (c: string) => <Path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0" stroke={c} {...STROKE} />,
+  image: (c: string) => (
+    <>
+      <Rect x={3} y={4} width={18} height={16} rx={2.5} stroke={c} {...STROKE} />
+      <Circle cx={9} cy={9.5} r={1.8} stroke={c} {...STROKE} />
+      <Path d="M3.5 17l5-5 4 4 2.5-2.5 5.5 5" stroke={c} {...STROKE} />
+    </>
+  ),
   edit: (c: string) => <Path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" stroke={c} {...STROKE} />,
 };
 

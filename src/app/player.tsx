@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
+import { Cover } from '@/components/Cover';
 import { DetailHeader } from '@/components/Header';
 import { Icon } from '@/components/Icon';
 import { Background } from '@/components/Screen';
@@ -12,10 +13,11 @@ import { SeekBar } from '@/components/SeekBar';
 import { EmptyState, formatTime, GlassCard, IconButton, Txt } from '@/components/ui';
 import { getPlayer } from '@/player/engine';
 import { useCurrentTrack, usePlayerStore } from '@/store/usePlayerStore';
-import { colors, layout, space } from '@/theme/tokens';
+import { colors, layout, radius, space } from '@/theme/tokens';
 
-/** Visuel du morceau : pas de pochette (hors périmètre), un motif généré à partir du titre. */
-function Artwork({ seed }: { seed: string }) {
+/** Pochette du morceau, ou à défaut un motif généré à partir du titre. */
+function Artwork({ seed, coverUri }: { seed: string; coverUri: string | null }) {
+  if (coverUri) return <Cover uri={coverUri} size="100%" rounded={radius.lg} style={styles.art} />;
   let h = 0;
   for (const c of seed) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   const rings = [0, 1, 2, 3].map((i) => 40 + ((h >> (i * 5)) % 60) + i * 30);
@@ -61,7 +63,7 @@ export default function Player() {
         right={<IconButton name="queue" label="File d'attente" onPress={() => router.push('/queue')} />}
       />
       <View style={styles.body}>
-        <Artwork seed={`${track.title}${track.artist}`} />
+        <Artwork seed={`${track.title}${track.artist}`} coverUri={track.coverUri} />
 
         <View style={styles.titleRow}>
           <View style={{ flex: 1 }}>

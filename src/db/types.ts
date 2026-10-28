@@ -21,6 +21,8 @@ export interface Track {
   license: TrackLicense;
   liked: boolean;
   addedAt: number;
+  /** Pochette (file://), ou null. */
+  coverUri: string | null;
 }
 
 export interface Playlist {
@@ -34,6 +36,7 @@ export interface AlbumSummary {
   album: string;
   artist: string;
   trackCount: number;
+  coverUri: string | null;
 }
 
 export interface ArtistSummary {
