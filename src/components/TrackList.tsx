@@ -9,7 +9,7 @@ import { TrackMenu } from './Sheet';
 import { TrackRow } from './TrackRow';
 
 export function TrackList({
-  tracks, header, empty, renderRight, menuExtra,
+  tracks, header, empty, renderRight, menuExtra, selection,
 }: {
   tracks: Track[];
   header?: ReactElement;
@@ -17,6 +17,8 @@ export function TrackList({
   renderRight?: (t: Track, index: number) => ReactNode;
   /** Actions ajoutées au menu (ex. "Retirer de la playlist"). Reçoit le morceau et une fonction de fermeture. */
   menuExtra?: (t: Track, close: () => void) => ReactNode;
+  /** Mode sélection : un appui coche / décoche au lieu de lancer la lecture. */
+  selection?: { selected: Set<number>; onToggle: (t: Track) => void };
 }) {
   const playTracks = usePlayerStore((s) => s.playTracks);
   const [menuFor, setMenuFor] = useState<Track | null>(null);
@@ -33,8 +35,9 @@ export function TrackList({
         renderItem={({ item, index }) => (
           <TrackRow
             track={item}
-            onPress={() => playTracks(tracks, index)}
-            onMore={() => setMenuFor(item)}
+            onPress={() => (selection ? selection.onToggle(item) : playTracks(tracks, index))}
+            onMore={selection ? undefined : () => setMenuFor(item)}
+            selected={selection ? selection.selected.has(item.id) : undefined}
             right={renderRight?.(item, index)}
           />
         )}

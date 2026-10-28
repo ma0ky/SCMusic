@@ -23,6 +23,8 @@ export interface Track {
   addedAt: number;
   /** Pochette (file://), ou null. */
   coverUri: string | null;
+  /** Titre, artiste, album ou numéro modifiés à la main dans l'app (le fichier, lui, n'est pas modifié). */
+  edited: boolean;
 }
 
 export interface Playlist {

@@ -1,4 +1,5 @@
 // Bibliothèque : titres, albums, artistes et titres aimés.
+// Mode sélection (titres) : cocher plusieurs titres pour modifier leurs infos d'un coup (ex. leur donner un album).
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
@@ -7,7 +8,7 @@ import { Cover } from '@/components/Cover';
 import { Icon } from '@/components/Icon';
 import { Screen } from '@/components/Screen';
 import { TrackList } from '@/components/TrackList';
-import { EmptyState, Txt } from '@/components/ui';
+import { EmptyState, IconButton, Txt } from '@/components/ui';
 import { albums, allTracks, artists, likedTracks } from '@/db/queries';
 import type { AlbumSummary, ArtistSummary, Track } from '@/db/types';
 import { useLibrary } from '@/store/useLibrary';
@@ -58,6 +59,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n > 1 ? 's' : ''}`;
 
 export default function Library() {
   const [tab, setTab] = useState<Tab>('tracks');
+  const [selected, setSelected] = useState<Set<number> | null>(null); // null = pas en mode sélection
   const { data } = useLibrary(
     async () => {
       if (tab === 'albums') return { albums: await albums() };
@@ -71,11 +73,42 @@ export default function Library() {
   const empty = <EmptyState icon="library" title="Rien ici pour l'instant" text={tab === 'liked' ? 'Appuie sur ♥ dans le lecteur pour aimer un titre.' : 'Scanne ton dossier musique depuis les réglages.'} />;
   const listStyle = { paddingHorizontal: space.sm, paddingBottom: layout.contentBottom };
 
+  const trackTab = tab === 'tracks' || tab === 'liked';
+  const shown = data.tracks ?? [];
+  const toggle = (t: Track) => {
+    const next = new Set(selected);
+    if (next.has(t.id)) next.delete(t.id);
+    else next.add(t.id);
+    setSelected(next);
+  };
+  const editSelected = () => {
+    if (!selected?.size) return;
+    router.push({ pathname: '/track-edit', params: { ids: [...selected].join(',') } });
+    setSelected(null);
+  };
+
+  const titleRight = !trackTab ? null : selected ? (
+    <>
+      <IconButton
+        name="check"
+        label={selected.size === shown.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+        active={selected.size === shown.length && shown.length > 0}
+        onPress={() => setSelected(selected.size === shown.length ? new Set() : new Set(shown.map((t) => t.id)))}
+      />
+      <IconButton name="edit" label="Modifier les titres choisis" onPress={editSelected} color={selected.size ? colors.accent : colors.textFaint} />
+      <IconButton name="close" label="Quitter la sélection" onPress={() => setSelected(null)} />
+    </>
+  ) : (
+    <IconButton name="edit" label="Sélectionner des titres à modifier" onPress={() => setSelected(new Set())} />
+  );
+
   return (
     <Screen>
-      <PageTitle title="Bibliothèque" />
-      <Segments value={tab} onChange={setTab} />
-      {(tab === 'tracks' || tab === 'liked') && <TrackList tracks={data.tracks ?? []} empty={empty} />}
+      <PageTitle title={selected ? `${selected.size} choisi${selected.size > 1 ? 's' : ''}` : 'Bibliothèque'} right={titleRight} />
+      <Segments value={tab} onChange={(t) => { setTab(t); setSelected(null); }} />
+      {trackTab && (
+        <TrackList tracks={shown} empty={empty} selection={selected ? { selected, onToggle: toggle } : undefined} />
+      )}
       {tab === 'albums' && (
         <FlatList
           data={data.albums ?? []}

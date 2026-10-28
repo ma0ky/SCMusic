@@ -80,6 +80,7 @@ const shapes = {
       <Path d="M3.5 17l5-5 4 4 2.5-2.5 5.5 5" stroke={c} {...STROKE} />
     </>
   ),
+  check: (c: string) => <Path d="M5 12.5l4.5 4.5L19 7.5" stroke={c} {...STROKE} />,
   stats: (c: string) => <Path d="M4 20h16M7 16v-4M12 16V6M17 16v-7" stroke={c} {...STROKE} />,
   lyrics: (c: string) => <Path d="M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM6 11a6 6 0 0 0 12 0M12 17v4M9 21h6" stroke={c} {...STROKE} />,
   edit: (c: string) => <Path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" stroke={c} {...STROKE} />,

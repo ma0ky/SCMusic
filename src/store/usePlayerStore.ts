@@ -4,7 +4,10 @@ import { create } from 'zustand';
 import * as Q from '@/player/queue';
 import * as engine from '@/player/engine';
 import * as tracker from '@/stats/tracker';
-import { markPlayed, setAlbumCover, setDuration, setLicense, setLiked, setTrackCover, tracksByIds } from '@/db/queries';
+import {
+  editTrackInfo, markPlayed, revertTrackInfo, setAlbumCover, setDuration, setLicense, setLiked, setTrackCover, tracksByIds,
+  type TrackInfoPatch,
+} from '@/db/queries';
 import type { Track, TrackLicense } from '@/db/types';
 
 /** "Précédent" revient au début du morceau s'il joue depuis plus de 3 s. */
@@ -33,6 +36,12 @@ interface PlayerState {
   changeLicense: (t: Track, license: TrackLicense) => Promise<void>;
   /** Change la pochette d'un morceau, ou de tout son album si `wholeAlbum`. null = retirer. */
   changeCover: (t: Track, coverUri: string | null, wholeAlbum: boolean) => Promise<void>;
+  /** Modifie titre / artiste / album / numéro dans la base (les fichiers ne sont pas touchés). */
+  editTracks: (ids: number[], patch: TrackInfoPatch) => Promise<void>;
+  revertTracks: (ids: number[]) => Promise<void>;
+  /** Dernier album renommé : l'écran de cet album suit son nouveau nom. */
+  albumRenamed: { from: string; to: string } | null;
+  renameAlbumSignal: (from: string, to: string) => void;
   libraryChanged: () => void;
 }
 
@@ -107,6 +116,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
     queue: Q.emptyQueue<Track>(),
     volume: 1,
     libraryVersion: 0,
+    albumRenamed: null,
 
     playTracks: (tracks, startIndex = 0) => apply(Q.loadQueue(get().queue, tracks, startIndex), { forceReload: true }),
 
@@ -174,6 +184,18 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
       if (playing && (playing.id === t.id || (wholeAlbum && sameAlbum(playing)))) engine.refreshLockScreen(playing);
       get().libraryChanged();
     },
+
+    editTracks: async (ids, patch) => {
+      await editTrackInfo(ids, patch);
+      get().libraryChanged();
+    },
+
+    revertTracks: async (ids) => {
+      await revertTrackInfo(ids);
+      get().libraryChanged();
+    },
+
+    renameAlbumSignal: (from, to) => set({ albumRenamed: { from, to } }),
 
     libraryChanged: () => {
       set({ libraryVersion: get().libraryVersion + 1 });

@@ -138,6 +138,7 @@ function TrackMenuBody({ track, onClose, extra }: TrackMenuProps & { track: Trac
           />
           <SheetItem icon="disc" label="Voir l'album" onPress={() => { done(); router.push({ pathname: '/album/[id]', params: { id: track.album } }); }} />
           <SheetItem icon="user" label="Voir l'artiste" onPress={() => { done(); router.push({ pathname: '/artist/[id]', params: { id: track.artist } }); }} />
+          <SheetItem icon="edit" label="Modifier les infos" onPress={() => { done(); router.push({ pathname: '/track-edit', params: { ids: String(track.id) } }); }} />
           <SheetItem icon="image" label="Pochette" onPress={() => setMode('cover')} />
           <SheetItem icon="edit" label="Licence du morceau" onPress={() => setMode('license')} />
           {extra}

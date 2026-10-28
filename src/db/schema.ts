@@ -72,6 +72,15 @@ const MIGRATIONS: string[] = [
   CREATE INDEX IF NOT EXISTS idx_plays_started ON plays(started_at);
   CREATE INDEX IF NOT EXISTS idx_plays_track ON plays(track_id);
   `,
+  // v5 : infos modifiées à la main (titre, artiste, album, numéro). Les fichiers ne sont jamais touchés :
+  // edited = 1 et les valeurs lues dans le fichier sont gardées dans orig_* pour pouvoir revenir en arrière.
+  `
+  ALTER TABLE tracks ADD COLUMN edited INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE tracks ADD COLUMN orig_title TEXT;
+  ALTER TABLE tracks ADD COLUMN orig_artist TEXT;
+  ALTER TABLE tracks ADD COLUMN orig_album TEXT;
+  ALTER TABLE tracks ADD COLUMN orig_track_no INTEGER;
+  `,
 ];
 
 export async function migrate(): Promise<void> {

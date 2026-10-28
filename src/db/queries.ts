@@ -16,6 +16,7 @@ interface TrackRow {
   liked: number;
   added_at: number;
   cover_uri: string | null;
+  edited: number;
 }
 
 const toTrack = (r: TrackRow): Track => ({
@@ -31,10 +32,11 @@ const toTrack = (r: TrackRow): Track => ({
   liked: r.liked === 1,
   addedAt: r.added_at,
   coverUri: r.cover_uri,
+  edited: r.edited === 1,
 });
 
 // Colonnes lues pour un Track : jamais les paroles, qui peuvent peser plusieurs Ko par titre.
-const TRACK_COLS = 'id, uri, filename, title, artist, album, track_no, duration, license, liked, added_at, cover_uri';
+const TRACK_COLS = 'id, uri, filename, title, artist, album, track_no, duration, license, liked, added_at, cover_uri, edited';
 const TRACK_COLS_T = TRACK_COLS.split(', ').map((c) => `t.${c}`).join(', ');
 
 const ORDER_BY_ALBUM = 'ORDER BY artist COLLATE NOCASE, album COLLATE NOCASE, track_no, title COLLATE NOCASE';
@@ -118,6 +120,54 @@ export async function setAlbumCover(album: string, coverUri: string | null): Pro
   await getDb().runAsync(
     'UPDATE tracks SET cover_uri = ?, cover_source = ? WHERE album = ? COLLATE NOCASE',
     coverUri, coverUri ? 'manual' : null, album,
+  );
+}
+
+// ---------- Infos modifiées à la main ----------
+
+/** Champs modifiables. undefined = ne pas changer ; trackNo null = retirer le numéro. */
+export interface TrackInfoPatch {
+  title?: string;
+  artist?: string;
+  album?: string;
+  trackNo?: number | null;
+}
+
+/**
+ * Modifie les infos de plusieurs morceaux dans la base (jamais dans les fichiers).
+ * À la première modification, les valeurs du fichier sont gardées dans orig_* pour pouvoir les restaurer.
+ * Les noms de colonnes sont fixes : seules les valeurs viennent de l'utilisateur, toujours en paramètres.
+ */
+export async function editTrackInfo(ids: number[], patch: TrackInfoPatch): Promise<void> {
+  if (!ids.length) return;
+  const sets: string[] = [];
+  const values: (string | number | null)[] = [];
+  if (patch.title !== undefined) { sets.push('title = ?'); values.push(patch.title); }
+  if (patch.artist !== undefined) { sets.push('artist = ?'); values.push(patch.artist); }
+  if (patch.album !== undefined) { sets.push('album = ?'); values.push(patch.album); }
+  if (patch.trackNo !== undefined) { sets.push('track_no = ?'); values.push(patch.trackNo); }
+  if (!sets.length) return;
+  // Dans un UPDATE SQLite, toutes les expressions lisent les valeurs d'avant la modification
+  await getDb().runAsync(
+    `UPDATE tracks SET
+       orig_title = CASE WHEN edited = 0 THEN title ELSE orig_title END,
+       orig_artist = CASE WHEN edited = 0 THEN artist ELSE orig_artist END,
+       orig_album = CASE WHEN edited = 0 THEN album ELSE orig_album END,
+       orig_track_no = CASE WHEN edited = 0 THEN track_no ELSE orig_track_no END,
+       edited = 1, ${sets.join(', ')}
+     WHERE id IN (${ids.map(() => '?').join(', ')})`,
+    ...values, ...ids,
+  );
+}
+
+/** Revient aux infos lues dans les fichiers. */
+export async function revertTrackInfo(ids: number[]): Promise<void> {
+  if (!ids.length) return;
+  await getDb().runAsync(
+    `UPDATE tracks SET title = orig_title, artist = orig_artist, album = orig_album, track_no = orig_track_no,
+       edited = 0, orig_title = NULL, orig_artist = NULL, orig_album = NULL, orig_track_no = NULL
+     WHERE edited = 1 AND id IN (${ids.map(() => '?').join(', ')})`,
+    ...ids,
   );
 }
 

@@ -3,7 +3,7 @@ import type { Track } from '@/db/types';
 
 const t = (id: number, title: string, artist: string, album: string): Track => ({
   id, title, artist, album, uri: `file://${id}`, filename: `${id}.mp3`, trackNo: null,
-  duration: null, license: 'personal', liked: false, addedAt: 0, coverUri: null,
+  duration: null, license: 'personal', liked: false, addedAt: 0, coverUri: null, edited: false,
 });
 
 const lib = [
