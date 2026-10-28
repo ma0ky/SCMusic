@@ -47,7 +47,7 @@ const MIGRATIONS: string[] = [
     value TEXT NOT NULL
   );
   `,
-  // v2 : pochettes. cover_source = 'tag' (intégrée), 'folder' (cover.jpg) ou 'manual' (choisie à la main).
+  // v2 : pochettes. cover_source = 'file' (nom.png à côté de nom.mp3), 'tag' (intégrée), 'folder' (cover.jpg) ou 'manual' (choisie à la main).
   // cover_checked = 1 quand le fichier a déjà été inspecté (évite de relire à chaque scan).
   `
   ALTER TABLE tracks ADD COLUMN cover_uri TEXT;

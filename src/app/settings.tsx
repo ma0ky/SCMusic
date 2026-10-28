@@ -119,7 +119,7 @@ export default function Settings() {
           </View>
           <Button title={dir ? 'Changer de dossier' : 'Choisir mon dossier'} icon="folder" onPress={choose} disabled={!!busy} />
           {dir && <Button title="Rescanner" kind="ghost" onPress={() => scan(dir)} disabled={!!busy} />}
-          <Txt variant="muted">Formats lus : MP3 et FLAC. Les tags et la pochette intégrée sont lus dans les fichiers ; sinon une image cover.jpg ou folder.jpg du dossier est utilisée.</Txt>
+          <Txt variant="muted">Formats lus : MP3 et FLAC. Image d’un titre : mets « nom.png » (ou .jpg) à côté de « nom.mp3 », puis rescanne. Sinon : image intégrée au fichier, puis cover.jpg du dossier.</Txt>
         </GlassCard>
 
         <SectionTitle>Partager avec un autre utilisateur</SectionTitle>

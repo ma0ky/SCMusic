@@ -17,6 +17,15 @@ export function fingerprint(data: Uint8Array): string {
   return `${(h >>> 0).toString(16)}${data.length.toString(16)}`;
 }
 
+/**
+ * Image portant le même nom que le morceau : "nom.mp3" → "nom.png" ou "nom.jpg".
+ * C'est la façon la plus simple d'associer une image à un titre précis.
+ */
+export function pickSidecarCover(audioName: string, fileNames: string[]): string | null {
+  const base = audioName.replace(/\.[^.]+$/, '').toLowerCase();
+  return fileNames.find((n) => IMAGE_EXT.test(n) && n.replace(IMAGE_EXT, '').toLowerCase() === base) ?? null;
+}
+
 /** Choisit l'image de pochette d'un dossier parmi ses fichiers (cover.jpg, folder.png…). */
 export function pickFolderCover(fileNames: string[]): string | null {
   const images = fileNames.filter((n) => IMAGE_EXT.test(n));

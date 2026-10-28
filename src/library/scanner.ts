@@ -5,7 +5,7 @@ import {
   getSetting, insertTrack, knownUris, removeTracksNotIn, setScannedCover, setSetting, urisWithoutCoverCheck,
   type CoverSource,
 } from '@/db/queries';
-import { pickFolderCover, saveCover, saveCoverFromFile } from './covers';
+import { pickFolderCover, pickSidecarCover, saveCover, saveCoverFromFile } from './covers';
 import { id3TagSize, parseTags } from './tags';
 
 const AUDIO_EXT = /\.(mp3|flac)$/i;
@@ -29,6 +29,7 @@ export async function pickMusicDir(): Promise<string | null> {
 
 interface AudioEntry {
   file: File;
+  sidecar: File | null; // nom.png à côté de nom.mp3
   folderCover: File | null; // cover.jpg / folder.png… du même dossier
 }
 
@@ -37,11 +38,12 @@ function listAudioFiles(dir: Directory, out: AudioEntry[] = [], depth = 0): Audi
   if (depth > 8) return out; // garde-fou contre les arborescences trop profondes
   const entries = dir.list();
   const files = entries.filter((e): e is File => e instanceof File);
-  const coverName = pickFolderCover(files.map((f) => f.name));
-  const folderCover = coverName ? files.find((f) => f.name === coverName) ?? null : null;
+  const names = files.map((f) => f.name);
+  const byName = (name: string | null) => (name ? files.find((f) => f.name === name) ?? null : null);
+  const folderCover = byName(pickFolderCover(names));
   for (const entry of entries) {
     if (entry instanceof Directory) listAudioFiles(entry, out, depth + 1);
-    else if (AUDIO_EXT.test(entry.name)) out.push({ file: entry, folderCover });
+    else if (AUDIO_EXT.test(entry.name)) out.push({ file: entry, sidecar: byName(pickSidecarCover(entry.name, names)), folderCover });
   }
   return out;
 }
@@ -81,12 +83,17 @@ async function readMetadata(file: File): Promise<Uint8Array> {
   }
 }
 
-/** Pochette d'un morceau : celle intégrée au fichier, sinon l'image du dossier. */
+/**
+ * Pochette d'un morceau, par ordre de priorité :
+ * image du même nom (nom.png), image intégrée au fichier, image du dossier (cover.jpg).
+ */
 async function findCover(
+  sidecar: File | null,
   picture: ReturnType<typeof parseTags>['picture'],
   folderCover: File | null,
   folderCache: Map<string, string>,
 ): Promise<{ uri: string | null; source: CoverSource | null }> {
+  if (sidecar) return { uri: await saveCoverFromFile(sidecar), source: 'file' };
   if (picture) return { uri: await saveCover(picture), source: 'tag' };
   if (folderCover) {
     let uri = folderCache.get(folderCover.uri);
@@ -122,13 +129,13 @@ export async function scanLibrary(dirUri: string, onProgress?: (p: ScanProgress)
   let covers = 0;
 
   for (let i = 0; i < entries.length; i++) {
-    const { file, folderCover } = entries[i];
+    const { file, sidecar, folderCover } = entries[i];
     seen.add(file.uri);
     const isNew = !known.has(file.uri);
     if (isNew || needCover.has(file.uri)) {
       try {
         const { picture, ...tags } = parseTags(await readMetadata(file), file.name);
-        const cover = await findCover(picture, folderCover, folderCache);
+        const cover = await findCover(sidecar, picture, folderCover, folderCache);
         if (cover.uri) covers++;
         if (isNew) {
           await insertTrack({ uri: file.uri, filename: file.name, ...tags, coverUri: cover.uri, coverSource: cover.source });
@@ -139,6 +146,14 @@ export async function scanLibrary(dirUri: string, onProgress?: (p: ScanProgress)
       } catch (e) {
         console.warn('Lecture impossible :', file.name, e);
         failed++;
+      }
+    } else if (sidecar) {
+      // Morceau déjà connu : une image nom.png ajoutée depuis le dernier scan est prise en compte
+      try {
+        await setScannedCover(file.uri, await saveCoverFromFile(sidecar), 'file');
+        covers++;
+      } catch (e) {
+        console.warn('Image illisible :', sidecar.name, e);
       }
     }
     if (i % 10 === 0 || i === entries.length - 1) onProgress?.({ done: i + 1, total: entries.length });

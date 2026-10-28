@@ -60,7 +60,7 @@ export interface NewTrack {
   coverSource?: CoverSource | null;
 }
 
-export type CoverSource = 'tag' | 'folder' | 'manual';
+export type CoverSource = 'file' | 'tag' | 'folder' | 'manual';
 
 export async function insertTrack(t: NewTrack): Promise<number> {
   const res = await getDb().runAsync(
