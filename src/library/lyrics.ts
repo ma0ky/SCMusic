@@ -21,10 +21,13 @@ export function pickSidecarLyrics(audioName: string, fileNames: string[]): strin
   return fileNames.find((n) => LRC_EXT.test(n) && n.replace(LRC_EXT, '').toLowerCase() === base) ?? null;
 }
 
-/** Nettoie le texte brut : BOM, fins de ligne Windows, blancs autour. null si vide. */
+/** Au-delà, ce ne sont plus des paroles : le texte est coupé (fichier .lrc ou tag piégé, collage accidentel). */
+export const MAX_LYRICS_CHARS = 100_000;
+
+/** Nettoie le texte brut : BOM, fins de ligne Windows, blancs autour, longueur limitée. null si vide. */
 export function cleanLyrics(text: string | undefined | null): string | null {
   if (!text) return null;
-  const cleaned = text.replace(/^﻿/, '').replace(/\u0000/g, '').replace(/\r\n?/g, '\n').trim();
+  const cleaned = text.slice(0, MAX_LYRICS_CHARS).replace(/^﻿/, '').replace(/\u0000/g, '').replace(/\r\n?/g, '\n').trim();
   return cleaned.length > 0 ? cleaned : null;
 }
 

@@ -10,7 +10,7 @@ import { Background } from '@/components/Screen';
 import { Button, EmptyState, formatTime, GlassCard, Txt } from '@/components/ui';
 import { setTrackLyrics, trackLyrics } from '@/db/queries';
 import { formatDay, searchLyricsOnline } from '@/library/lrclib';
-import { cleanLyrics, lyricsToPlainText, toLrc } from '@/library/lyrics';
+import { cleanLyrics, lyricsToPlainText, MAX_LYRICS_CHARS, toLrc } from '@/library/lyrics';
 import { getPlayer } from '@/player/engine';
 import { useCurrentTrack, usePlayerStore } from '@/store/usePlayerStore';
 import { colors, font, fontFamily, layout, radius, space } from '@/theme/tokens';
@@ -165,6 +165,7 @@ export default function LyricsEdit() {
           <TextInput
             value={text}
             onChangeText={setText}
+            maxLength={MAX_LYRICS_CHARS}
             multiline
             placeholder={'Une ligne de paroles par ligne…'}
             placeholderTextColor={colors.textFaint}

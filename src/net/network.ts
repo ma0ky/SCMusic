@@ -64,6 +64,30 @@ export async function netFetch(url: string, { headers, signal, timeoutMs = TIMEO
   }
 }
 
+/** Taille maximale acceptée pour une réponse texte / JSON (paroles, albums, infos de version). */
+export const MAX_RESPONSE_CHARS = 2 * 1024 * 1024;
+
+/**
+ * Lit le corps d'une réponse en refusant ce qui est anormalement gros : une réponse piégée
+ * ou corrompue ne doit pas saturer la mémoire ni bloquer l'app.
+ */
+export async function readText(res: Response, maxChars = MAX_RESPONSE_CHARS): Promise<string> {
+  const declared = Number(res.headers?.get('content-length'));
+  if (declared > maxChars) throw new Error('Réponse du serveur trop volumineuse, ignorée.');
+  const text = await res.text();
+  if (text.length > maxChars) throw new Error('Réponse du serveur trop volumineuse, ignorée.');
+  return text;
+}
+
+export async function readJson<T>(res: Response, maxChars = MAX_RESPONSE_CHARS): Promise<T> {
+  try {
+    return JSON.parse(await readText(res, maxChars)) as T;
+  } catch (e) {
+    if (e instanceof SyntaxError) throw new Error('Réponse du serveur illisible.');
+    throw e;
+  }
+}
+
 /** Téléchargement d'un fichier, avec les mêmes règles que netFetch (sauf le délai : un gros fichier peut être long). */
 export async function netDownload(
   url: string,

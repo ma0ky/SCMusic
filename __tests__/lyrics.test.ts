@@ -1,4 +1,4 @@
-import { activeLineIndex, cleanLyrics, formatLrcTime, lyricsToPlainText, parseLyrics, pickSidecarLyrics, toLrc } from '@/library/lyrics';
+import { MAX_LYRICS_CHARS, activeLineIndex, cleanLyrics, formatLrcTime, lyricsToPlainText, parseLyrics, pickSidecarLyrics, toLrc } from '@/library/lyrics';
 
 test('fichier de paroles du même nom que le morceau', () => {
   const files = ['Ma Chanson.mp3', 'ma chanson.LRC', 'Autre.flac', 'cover.jpg'];
@@ -47,4 +47,8 @@ test('synchro au doigt : génère un LRC relisible', () => {
   expect(lrc).toBe('[00:01.50]Un\n[01:02.00]Deux');
   expect(parseLyrics(lrc).lines).toEqual([{ time: 1.5, text: 'Un' }, { time: 62, text: 'Deux' }]);
   expect(lyricsToPlainText(lrc)).toBe('Un\nDeux');
+});
+
+test('paroles anormalement longues : coupées', () => {
+  expect(cleanLyrics('a'.repeat(MAX_LYRICS_CHARS + 50))).toHaveLength(MAX_LYRICS_CHARS);
 });

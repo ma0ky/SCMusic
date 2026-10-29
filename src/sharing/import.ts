@@ -2,7 +2,7 @@
 // Les fichiers audio joints sont copiés dans l'espace privé de l'app.
 import { Directory, File, Paths } from 'expo-file-system';
 import { addToPlaylist, allTracks, createPlaylist, insertTrack, trackByUri } from '@/db/queries';
-import { MANIFEST_NAME, matchTracks, parseManifest, type ShareManifest } from './format';
+import { looksLikeAudio, MANIFEST_NAME, MAX_AUDIO_BYTES, MAX_MANIFEST_BYTES, matchTracks, parseManifest, type ShareManifest } from './format';
 
 export interface ImportResult {
   playlists: number;
@@ -32,8 +32,11 @@ async function applyManifest(manifest: ShareManifest, folder: Directory | null):
         if (!src) continue;
         const dest = new File(target, t.file!);
         if (await trackByUri(dest.uri)) continue; // déjà importé
+        if (src.size > MAX_AUDIO_BYTES) continue; // fichier anormalement gros : ignoré
+        const data = await src.bytes();
+        if (!looksLikeAudio(data)) continue; // l'extension ment : ce n'est pas un MP3 / FLAC
         dest.create({ overwrite: true });
-        await dest.write(await src.bytes());
+        await dest.write(data);
         await insertTrack({ uri: dest.uri, filename: t.file!, title: t.title, artist: t.artist, album: t.album, license: t.license });
         audioImported++;
       }
@@ -54,17 +57,23 @@ async function applyManifest(manifest: ShareManifest, folder: Directory | null):
   return { playlists: manifest.playlists.length, tracksLinked, audioImported, missing };
 }
 
+/** Lit le fichier de partage après avoir vérifié sa taille. */
+async function readManifest(file: File): Promise<ShareManifest> {
+  if (file.size > MAX_MANIFEST_BYTES) throw new Error('Fichier de partage trop volumineux (5 Mo maximum).');
+  return parseManifest(await file.text());
+}
+
 /** Importer un dossier d'export (contenant scmusic-share.json). */
 export async function importFromFolder(): Promise<ImportResult> {
   const folder = await Directory.pickDirectoryAsync();
   const manifestFile = folder.list().find((e): e is File => e instanceof File && e.name === MANIFEST_NAME);
   if (!manifestFile) throw new Error(`Aucun fichier ${MANIFEST_NAME} dans ce dossier.`);
-  return applyManifest(parseManifest(await manifestFile.text()), folder);
+  return applyManifest(await readManifest(manifestFile), folder);
 }
 
 /** Importer seulement des playlists reçues en JSON (aucun fichier audio). */
 export async function importFromJsonFile(): Promise<ImportResult | null> {
   const picked = await File.pickFileAsync({ mimeTypes: ['application/json', 'text/plain', '*/*'] });
   if (picked.canceled) return null;
-  return applyManifest(parseManifest(await picked.result.text()), null);
+  return applyManifest(await readManifest(picked.result), null);
 }

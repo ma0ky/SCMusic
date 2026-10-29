@@ -4,7 +4,8 @@
 import Constants from 'expo-constants';
 import { lyricsNotFoundAt, saveLyricsNotFound } from '@/db/queries';
 import type { Track } from '@/db/types';
-import { netFetch, OfflineError } from '@/net/network';
+import { cleanLyrics } from './lyrics';
+import { netFetch, OfflineError, readJson } from '@/net/network';
 
 const SEARCH_URL = 'https://lrclib.net/api/search';
 /** Écart de durée toléré entre le fichier et le résultat (versions radio, live…). */
@@ -31,6 +32,7 @@ export interface FoundLyrics {
  * puis des paroles simples à la bonne durée, puis n'importe quelles paroles synchronisées.
  */
 export function pickBestMatch(results: LrclibResult[], duration: number | null): LrclibResult | null {
+  if (!Array.isArray(results)) return null; // réponse inattendue
   const withLyrics = results.filter((r) => !r.instrumental && (r.syncedLyrics?.trim() || r.plainLyrics?.trim()));
   const gap = (r: LrclibResult) => (duration && r.duration ? Math.abs(r.duration - duration) : 0);
   const close = withLyrics.filter((r) => gap(r) <= DURATION_TOLERANCE).sort((a, b) => gap(a) - gap(b));
@@ -81,7 +83,7 @@ export async function searchLyricsOnline(
   if (res.status === 503 || res.status === 429) throw new Error('LRCLIB est surchargé, réessaie dans un moment.');
   if (!res.ok) throw new Error(`LRCLIB a répondu une erreur (${res.status}).`);
 
-  const best = pickBestMatch((await res.json()) as LrclibResult[], track.duration);
+  const best = pickBestMatch(await readJson<LrclibResult[]>(res), track.duration);
   if (!best) {
     await saveLyricsNotFound(track);
     return { kind: 'none' };
@@ -89,6 +91,6 @@ export async function searchLyricsOnline(
   const synced = !!best.syncedLyrics?.trim();
   return {
     kind: 'found',
-    lyrics: { text: (synced ? best.syncedLyrics : best.plainLyrics)!.trim(), synced, source: `${best.artistName} – ${best.trackName}` },
+    lyrics: { text: cleanLyrics(synced ? best.syncedLyrics : best.plainLyrics) ?? '', synced, source: `${best.artistName} – ${best.trackName}` },
   };
 }

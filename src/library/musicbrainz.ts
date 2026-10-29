@@ -3,7 +3,7 @@
 // MusicBrainz demande au plus une requête par seconde et une application identifiée (User-Agent).
 import Constants from 'expo-constants';
 import type { Track } from '@/db/types';
-import { netFetch, OfflineError } from '@/net/network';
+import { netFetch, OfflineError, readJson } from '@/net/network';
 import { normalize } from '@/search/search';
 
 const SEARCH_URL = 'https://musicbrainz.org/ws/2/recording/';
@@ -148,6 +148,6 @@ async function requestAlbum(
   }
   if (res.status === 503 || res.status === 429) return 'busy';
   if (!res.ok) throw new Error(`MusicBrainz a répondu une erreur (${res.status}).`);
-  const data = (await res.json()) as { recordings?: MbRecording[] };
-  return pickAlbum(data.recordings ?? [], track);
+  const data = await readJson<{ recordings?: MbRecording[] }>(res);
+  return pickAlbum(Array.isArray(data?.recordings) ? data.recordings : [], track);
 }

@@ -100,22 +100,34 @@ async function findCover(
   folderCover: File | null,
   folderCache: Map<string, string>,
 ): Promise<{ uri: string | null; source: CoverSource | null }> {
-  if (sidecar) return { uri: await saveCoverFromFile(sidecar), source: 'file' };
-  if (picture) return { uri: await saveCover(picture), source: 'tag' };
-  if (folderCover) {
-    let uri = folderCache.get(folderCover.uri);
-    if (!uri) {
-      uri = await saveCoverFromFile(folderCover);
-      folderCache.set(folderCover.uri, uri);
+  // Une image refusée (trop grande, illisible) n'empêche pas d'ajouter le morceau : on passe à la suivante
+  const attempt = async (name: string, save: () => Promise<string>): Promise<string | null> => {
+    try {
+      return await save();
+    } catch (e) {
+      console.warn('Image ignorée :', name, e instanceof Error ? e.message : e);
+      return null;
     }
-    return { uri, source: 'folder' };
+  };
+  const fromSidecar = sidecar && (await attempt(sidecar.name, () => saveCoverFromFile(sidecar)));
+  if (fromSidecar) return { uri: fromSidecar, source: 'file' };
+  const fromTag = picture && (await attempt('image intégrée', () => saveCover(picture)));
+  if (fromTag) return { uri: fromTag, source: 'tag' };
+  if (folderCover) {
+    let uri = folderCache.get(folderCover.uri) ?? null;
+    if (!uri) {
+      uri = await attempt(folderCover.name, () => saveCoverFromFile(folderCover));
+      if (uri) folderCache.set(folderCover.uri, uri);
+    }
+    if (uri) return { uri, source: 'folder' };
   }
   return { uri: null, source: null };
 }
 
 /** Paroles d'un morceau : fichier nom.lrc en priorité, sinon celles intégrées aux tags. */
 async function findLyrics(lrc: File | null, fromTags: string | undefined): Promise<string | null> {
-  if (lrc) {
+  // Un .lrc de plus de 1 Mo n'est pas un fichier de paroles : ignoré
+  if (lrc && lrc.size <= 1024 * 1024) {
     try {
       const text = cleanLyrics(await lrc.text());
       if (text) return text;

@@ -47,6 +47,8 @@ Il est signé avec une clé de développement locale : suffisant pour un usage p
 Les APK signés sont publiés sur le dépôt public [ma0ky/SCMusic-releases](https://github.com/ma0ky/SCMusic-releases) (le code reste privé).
 À l'ouverture, au plus une fois par semaine et seulement en Wi-Fi (réglable), l'app regarde s'il existe une version plus récente et propose **Mettre à jour** :
 elle télécharge l'APK, vérifie son empreinte SHA-256, puis l'installateur d'Android demande de confirmer.
+Une version n'est proposée que si son APK **et** son fichier `.sha256` viennent du dépôt de releases (adresse vérifiée) :
+sans empreinte, rien n'est installé. L'empreinte prouve que le fichier est intact, la signature (vérifiée par Android) qu'il vient bien de nous.
 La première fois, Android demande d'autoriser SCMusic à installer des applications. On peut aussi vérifier à la main, ou couper la vérification, dans **Réglages → Mises à jour**.
 
 Publier une nouvelle version :
@@ -80,6 +82,20 @@ Chaque morceau a une **licence**, modifiable depuis son menu `…` → *Licence 
 
 **Réglages → Partager** crée un dossier `SCMusic-export-…` contenant `scmusic-share.json` (+ les fichiers autorisés).
 Sur l'autre téléphone : **Réglages → Importer un dossier d'export**. Les titres d'une playlist sont retrouvés dans la bibliothèque du destinataire par titre et artiste.
+
+## Sécurité des fichiers reçus
+
+Tout ce qui vient de l'extérieur (partage reçu, fichiers du téléphone, réponses des serveurs) est limité et vérifié :
+
+| Entrée | Limites |
+|---|---|
+| Fichier de partage `scmusic-share.json` | 5 Mo, 500 playlists, 10 000 titres par playlist ; textes nettoyés (caractères invisibles et de direction retirés, 200 caractères max) |
+| Audio joint à un partage | `.mp3` / `.flac` sans chemin, 300 Mo max, contenu vérifié (en-tête ID3, MPEG ou FLAC) |
+| Pochettes (fichier, tag, dossier) | JPEG / PNG valide, 15 Mo et ~50 millions de pixels max ; une image refusée n'empêche pas d'ajouter le morceau |
+| Paroles (`.lrc`, tags, LRCLIB, collage) | `.lrc` de 1 Mo max, texte coupé à 100 000 caractères |
+| Réponses LRCLIB, MusicBrainz, GitHub | 2 Mo max, format vérifié avant usage |
+
+Les données de l'app (bibliothèque, stats, paroles) sont exclues de la sauvegarde Android (`allowBackup: false`) : elles ne quittent pas le téléphone.
 
 ## Organisation du code
 

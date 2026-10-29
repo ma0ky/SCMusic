@@ -1,4 +1,4 @@
-import { buildExportPlan, canShareAudio, matchTracks, parseManifest } from '@/sharing/format';
+import { buildExportPlan, canShareAudio, looksLikeAudio, matchTracks, parseManifest } from '@/sharing/format';
 import type { Track, TrackLicense } from '@/db/types';
 
 const t = (id: number, title: string, license: TrackLicense): Track => ({
@@ -53,4 +53,29 @@ test('import : retrouve les morceaux de la bibliothèque (accents et casse ignor
   const r = matchTracks([{ title: 'ete', artist: 'ARTISTE', album: '', license: 'personal' }, { title: 'Absent', artist: 'Y', album: '', license: 'cc' }], lib);
   expect(r.found.map((x) => x.id)).toEqual([10]);
   expect(r.missing.map((x) => x.title)).toEqual(['Absent']);
+});
+
+test('import : textes nettoyés, noms de fichiers stricts, tailles limitées', () => {
+  const m = parseManifest(JSON.stringify({
+    format: 'scmusic-share', version: 1, playlists: [{ name: 'P\u202Eevil', tracks: [
+      { title: 'A\u0000B', artist: 'x'.repeat(500), album: 42, license: 'own', file: 'ok.flac' },
+      { title: 'C', artist: 'X', album: '', license: 'own', file: 'script.sh' },
+      { title: 'D', artist: 'X', album: '', license: 'own', file: 'a\\b.mp3' },
+    ] }],
+  }));
+  const [p] = m.playlists;
+  expect(p.name).toBe('P evil');
+  expect(p.tracks[0]).toMatchObject({ title: 'A B', album: '', file: 'ok.flac' });
+  expect(p.tracks[0].artist).toHaveLength(200);
+  expect(p.tracks.map((x) => x.file)).toEqual(['ok.flac', undefined, undefined]);
+
+  const many = { format: 'scmusic-share', version: 1, playlists: Array(501).fill({ name: 'p', tracks: [] }) };
+  expect(() => parseManifest(JSON.stringify(many))).toThrow('Trop de playlists');
+});
+
+test('import : contenu audio vérifié (et pas seulement l’extension)', () => {
+  expect(looksLikeAudio(Uint8Array.of(0x49, 0x44, 0x33, 4))).toBe(true); // ID3
+  expect(looksLikeAudio(Uint8Array.of(0x66, 0x4c, 0x61, 0x43))).toBe(true); // fLaC
+  expect(looksLikeAudio(Uint8Array.of(0xff, 0xfb, 0x90, 0))).toBe(true); // trame MPEG
+  expect(looksLikeAudio(Uint8Array.of(0x23, 0x21, 0x2f, 0x62))).toBe(false); // "#!/b"
 });

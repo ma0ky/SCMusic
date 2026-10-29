@@ -2,10 +2,18 @@
 // Logique pure, testée dans __tests__/export.test.ts.
 import { normalize } from '@/search/search';
 import type { Track, TrackLicense } from '@/db/types';
+import { cleanField } from '@/library/trackInfo';
 
 export const SHARE_FORMAT = 'scmusic-share';
 export const SHARE_VERSION = 1;
 export const MANIFEST_NAME = 'scmusic-share.json';
+
+// Limites d'un partage reçu : un fichier piégé ne doit pas saturer la mémoire ni la base.
+export const MAX_MANIFEST_BYTES = 5 * 1024 * 1024;
+export const MAX_AUDIO_BYTES = 300 * 1024 * 1024;
+const MAX_PLAYLISTS = 500;
+const MAX_TRACKS_PER_PLAYLIST = 10_000;
+const AUDIO_FILE = /^[^\\/\u0000-\u001f]{1,200}\.(mp3|flac)$/i;
 
 export interface SharedTrack {
   title: string;
@@ -81,6 +89,19 @@ export function buildExportPlan(
   };
 }
 
+/** Nom de fichier audio joint acceptable : .mp3 ou .flac, sans dossier, sans "..", sans caractère de contrôle. */
+export function isSafeAudioName(name: string): boolean {
+  return AUDIO_FILE.test(name) && !name.includes('..');
+}
+
+/** Les premiers octets correspondent-ils bien à un MP3 (tag ID3 ou trame MPEG) ou à un FLAC ? */
+export function looksLikeAudio(data: Uint8Array): boolean {
+  if (data.length < 4) return false;
+  const ascii = String.fromCharCode(data[0], data[1], data[2], data[3]);
+  if (ascii.startsWith('ID3') || ascii === 'fLaC') return true;
+  return data[0] === 0xff && (data[1] & 0xe0) === 0xe0;
+}
+
 /** Vérifie qu'un JSON reçu est bien un export SCMusic valide. Lève une erreur sinon. */
 export function parseManifest(json: string): ShareManifest {
   let data: unknown;
@@ -96,19 +117,25 @@ export function parseManifest(json: string): ShareManifest {
   if (typeof m.version !== 'number' || m.version > SHARE_VERSION) {
     throw new Error('Export créé par une version plus récente de SCMusic.');
   }
+  if (m.playlists.length > MAX_PLAYLISTS) throw new Error(`Trop de playlists dans ce fichier (${MAX_PLAYLISTS} maximum).`);
   const licenses: TrackLicense[] = ['personal', 'own', 'cc'];
-  const playlists = m.playlists.map((p) => ({
-    name: String(p?.name ?? 'Playlist importée').slice(0, 100),
-    tracks: (Array.isArray(p?.tracks) ? p.tracks : []).map((t) => ({
-      title: String(t?.title ?? ''),
-      artist: String(t?.artist ?? ''),
-      album: String(t?.album ?? ''),
-      license: licenses.includes(t?.license) ? t.license : 'personal',
-      // un fichier joint n'est accepté que si sa licence l'autorise, et sans chemin
-      file:
-        typeof t?.file === 'string' && canShareAudio(t.license) && !/[\\/]|\.\./.test(t.file) ? t.file : undefined,
-    })),
-  }));
+  // Les textes reçus sont nettoyés comme une saisie à la main (caractères invisibles, longueur)
+  const text = (v: unknown) => cleanField(typeof v === 'string' ? v : '');
+  const playlists = m.playlists.map((p) => {
+    const tracks = Array.isArray(p?.tracks) ? p.tracks : [];
+    if (tracks.length > MAX_TRACKS_PER_PLAYLIST) throw new Error(`Playlist trop longue (${MAX_TRACKS_PER_PLAYLIST} titres maximum).`);
+    return {
+      name: (text(p?.name) || 'Playlist importée').slice(0, 100),
+      tracks: tracks.map((t) => ({
+        title: text(t?.title),
+        artist: text(t?.artist),
+        album: text(t?.album),
+        license: licenses.includes(t?.license) ? t.license : 'personal',
+        // un fichier joint n'est accepté que si sa licence l'autorise : simple nom de fichier audio, sans chemin
+        file: typeof t?.file === 'string' && canShareAudio(t.license) && isSafeAudioName(t.file) ? t.file : undefined,
+      })),
+    };
+  });
   return { format: SHARE_FORMAT, version: m.version, createdAt: String(m.createdAt ?? ''), playlists };
 }
 

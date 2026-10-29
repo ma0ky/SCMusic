@@ -2,7 +2,7 @@
 import { getNetworkStateAsync } from 'expo-network';
 import { Platform } from 'react-native';
 import { searchLyricsOnline } from '@/library/lrclib';
-import { netFetch, OfflineError, setOfflineMode } from '@/net/network';
+import { netFetch, OfflineError, readJson, readText, setOfflineMode } from '@/net/network';
 import { checkForUpdate } from '@/update/updater';
 
 const mockSettings = new Map<string, string>();
@@ -21,7 +21,9 @@ jest.mock('expo-constants', () => ({ expoConfig: { version: '1.0.0' } }));
 
 const fetchMock = jest.fn();
 globalThis.fetch = fetchMock as unknown as typeof fetch;
-const json = (body: unknown, status = 200) => ({ ok: status < 400, status, json: async () => body, text: async () => '' });
+const json = (body: unknown, status = 200) => ({
+  ok: status < 400, status, headers: { get: () => null }, json: async () => body, text: async () => JSON.stringify(body),
+});
 const track = { id: 1, title: 'Cry For Me', artist: 'The Weeknd', duration: 224 };
 
 beforeEach(async () => {
@@ -51,6 +53,15 @@ test('délai maximum : la requête est abandonnée', async () => {
   await expect(netFetch('https://exemple.org', { timeoutMs: 20 })).rejects.toThrow('abort');
 });
 
+test('réponse trop volumineuse ou illisible : refusée', async () => {
+  const big = { headers: { get: () => String(10 * 1024 * 1024) }, text: async () => '' } as unknown as Response;
+  await expect(readText(big)).rejects.toThrow('trop volumineuse');
+  const long = { headers: { get: () => null }, text: async () => 'x'.repeat(2000) } as unknown as Response;
+  await expect(readText(long, 1000)).rejects.toThrow('trop volumineuse');
+  const bad = { headers: { get: () => null }, text: async () => '<html>' } as unknown as Response;
+  await expect(readJson(bad)).rejects.toThrow('illisible');
+});
+
 test('paroles introuvables : gardé en mémoire, pas de 2e requête (sauf « quand même »)', async () => {
   fetchMock.mockResolvedValue(json([]));
   expect(await searchLyricsOnline(track)).toEqual({ kind: 'none' });
@@ -64,7 +75,14 @@ describe('vérification automatique des mises à jour', () => {
   // Les mises à jour ne concernent qu'Android (Jest simule iOS par défaut)
   beforeAll(() => Object.defineProperty(Platform, 'OS', { get: () => 'android' }));
 
-  const release = { tag_name: 'v9.0.0', assets: [{ name: 'SCMusic-9.0.0.apk', browser_download_url: 'u', size: 1 }] };
+  const dl = 'https://github.com/ma0ky/SCMusic-releases/releases/download/v9.0.0/';
+  const release = {
+    tag_name: 'v9.0.0',
+    assets: [
+      { name: 'SCMusic-9.0.0.apk', browser_download_url: `${dl}SCMusic-9.0.0.apk`, size: 1 },
+      { name: 'SCMusic-9.0.0.apk.sha256', browser_download_url: `${dl}SCMusic-9.0.0.apk.sha256`, size: 1 },
+    ],
+  };
 
   test('en données mobiles : attend le Wi-Fi', async () => {
     jest.mocked(getNetworkStateAsync).mockResolvedValue({ type: 'CELLULAR', isConnected: true } as never);
