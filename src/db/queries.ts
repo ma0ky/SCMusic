@@ -171,6 +171,37 @@ export async function revertTrackInfo(ids: number[]): Promise<void> {
   );
 }
 
+// ---------- Recherches d'album déjà faites ----------
+
+export interface CachedAlbumLookup {
+  album: string | null; // null = rien trouvé
+  trackNo: number | null;
+  year: string | null;
+}
+
+/** Résultats déjà obtenus pour ces morceaux, tant que leur titre et leur artiste n'ont pas changé. */
+export async function cachedAlbumLookups(ids: number[]): Promise<Map<number, CachedAlbumLookup>> {
+  if (!ids.length) return new Map();
+  const rows = await getDb().getAllAsync<{ track_id: number; album: string | null; track_no: number | null; year: string | null }>(
+    `SELECT l.track_id, l.album, l.track_no, l.year FROM album_lookups l JOIN tracks t ON t.id = l.track_id
+     WHERE l.query_title = t.title AND l.query_artist = t.artist AND l.track_id IN (${ids.map(() => '?').join(', ')})`,
+    ...ids,
+  );
+  return new Map(rows.map((r) => [r.track_id, { album: r.album, trackNo: r.track_no, year: r.year }]));
+}
+
+export async function saveAlbumLookup(
+  track: Pick<Track, 'id' | 'title' | 'artist'>,
+  result: { album: string; trackNo: number | null; year: string | null } | null,
+): Promise<void> {
+  await getDb().runAsync(
+    `INSERT INTO album_lookups (track_id, query_title, query_artist, album, track_no, year, looked_up_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(track_id) DO UPDATE SET query_title = excluded.query_title, query_artist = excluded.query_artist,
+       album = excluded.album, track_no = excluded.track_no, year = excluded.year, looked_up_at = excluded.looked_up_at`,
+    track.id, track.title, track.artist, result?.album ?? null, result?.trackNo ?? null, result?.year ?? null, Date.now(),
+  );
+}
+
 // ---------- Paroles ----------
 
 /** URIs des morceaux dont les tags n'ont jamais été inspectés pour les paroles (scannés avant la v3). */

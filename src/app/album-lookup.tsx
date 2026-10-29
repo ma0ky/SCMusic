@@ -1,6 +1,7 @@
 // Trouver l'album de plusieurs titres sur MusicBrainz, puis choisir quelles propositions appliquer.
 // Une requête par seconde (règle de MusicBrainz). Rien n'est modifié avant d'appuyer sur "Appliquer",
 // et seulement dans la base de SCMusic (les fichiers ne sont pas touchés, "Revenir aux infos" annule).
+// Chaque résultat est gardé : un titre déjà cherché n'est jamais redemandé (sauf si son titre ou artiste change).
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
@@ -9,14 +10,21 @@ import { DetailHeader } from '@/components/Header';
 import { Icon } from '@/components/Icon';
 import { Background } from '@/components/Screen';
 import { Button, EmptyState, GlassCard, Txt } from '@/components/ui';
-import { editTrackInfo, tracksByIds } from '@/db/queries';
+import { cachedAlbumLookups, editTrackInfo, saveAlbumLookup, tracksByIds, type CachedAlbumLookup } from '@/db/queries';
 import type { Track } from '@/db/types';
 import { findAlbumOnline, REQUEST_INTERVAL_MS, type AlbumMatch } from '@/library/musicbrainz';
 import { parseIds } from '@/library/trackInfo';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { colors, layout, radius, space } from '@/theme/tokens';
 
-type Result = { state: 'found'; match: AlbumMatch; checked: boolean } | { state: 'none' } | { state: 'error' };
+type Result = ({ state: 'found'; match: AlbumMatch; checked: boolean } | { state: 'none' }) & { cached?: boolean };
+
+/** Proposition → résultat affiché. Un album identique à l'actuel n'a rien à proposer. */
+function toResult(t: Track, match: AlbumMatch | CachedAlbumLookup | null, cached = false): Result {
+  return match?.album && match.album !== t.album
+    ? { state: 'found', match: { album: match.album, trackNo: match.trackNo, year: match.year }, checked: true, cached }
+    : { state: 'none', cached };
+}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -32,7 +40,17 @@ export default function AlbumLookup() {
   const idsKey = parseIds(params.ids).join(',');
 
   useEffect(() => {
-    tracksByIds(idsKey ? idsKey.split(',').map(Number) : []).then(setTracks);
+    const ids = idsKey ? idsKey.split(',').map(Number) : [];
+    // Résultats déjà connus d'abord : ces titres ne partiront pas sur le réseau
+    Promise.all([tracksByIds(ids), cachedAlbumLookups(ids)]).then(([list, cache]) => {
+      const known: Record<number, Result> = {};
+      for (const t of list) {
+        const c = cache.get(t.id);
+        if (c) known[t.id] = toResult(t, c, true);
+      }
+      setResults(known);
+      setTracks(list);
+    });
   }, [idsKey]);
 
   // Quitter l'écran arrête la recherche en cours
@@ -41,6 +59,8 @@ export default function AlbumLookup() {
   if (!tracks) return <View style={styles.root} />;
 
   const done = Object.keys(results).length;
+  const toSearch = tracks.filter((t) => !results[t.id]).length;
+  const cachedCount = tracks.filter((t) => results[t.id]?.cached).length;
   const found = tracks.filter((t) => results[t.id]?.state === 'found');
   const checked = found.filter((t) => (results[t.id] as { checked: boolean }).checked);
 
@@ -49,22 +69,22 @@ export default function AlbumLookup() {
     abort.current = controller;
     setRunning(true);
     try {
-      for (let i = 0; i < tracks.length; i++) {
-        const t = tracks[i];
+      const pending = tracks.filter((t) => !results[t.id]); // déjà cherchés : pas de nouvelle requête
+      for (let i = 0; i < pending.length; i++) {
+        const t = pending[i];
         if (controller.signal.aborted) break;
-        if (results[t.id]) continue; // déjà cherché (reprise après un arrêt)
         let result: Result;
         try {
           const match = await findAlbumOnline(t, controller.signal);
-          // Proposition identique à l'album actuel : rien à changer
-          result = match && match.album !== t.album ? { state: 'found', match, checked: true } : { state: 'none' };
+          await saveAlbumLookup(t, match);
+          result = toResult(t, match);
         } catch (e) {
           if (controller.signal.aborted) break;
           Alert.alert('Recherche interrompue', e instanceof Error ? e.message : String(e));
           break;
         }
         setResults((r) => ({ ...r, [t.id]: result }));
-        if (i < tracks.length - 1) await sleep(REQUEST_INTERVAL_MS);
+        if (i < pending.length - 1) await sleep(REQUEST_INTERVAL_MS);
       }
     } finally {
       setRunning(false);
@@ -94,14 +114,14 @@ export default function AlbumLookup() {
     }
   };
 
-  const seconds = Math.ceil(((tracks.length - done) * REQUEST_INTERVAL_MS) / 1000);
+  const seconds = Math.ceil((toSearch * REQUEST_INTERVAL_MS) / 1000);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <Background />
       <DetailHeader
         title="Trouver les albums"
-        subtitle={running ? `Recherche… ${done} / ${tracks.length}` : done ? `${found.length} album(s) trouvé(s) sur ${done}` : `${tracks.length} titre(s)`}
+        subtitle={running ? `Recherche… ${done} / ${tracks.length}` : `${found.length} proposition(s) · ${toSearch} titre(s) à chercher`}
         icon="down"
       />
       <FlatList
@@ -110,17 +130,21 @@ export default function AlbumLookup() {
         contentContainerStyle={{ padding: layout.gutter, gap: space.sm, paddingBottom: space.xxl }}
         ListHeaderComponent={
           <View style={{ gap: space.md, marginBottom: space.md }}>
-            {!done && !running && (
+            {cachedCount > 0 && (
+              <Txt variant="muted">
+                {cachedCount} titre(s) déjà cherché(s) : résultat enregistré sur le téléphone, sans nouvelle connexion.
+              </Txt>
+            )}
+            {!running && toSearch > 0 && (
               <GlassCard style={styles.card}>
                 <Txt variant="muted">
-                  SCMusic envoie le titre et l’artiste de chaque morceau à musicbrainz.org (base musicale libre), un par seconde : environ {seconds} s.
-                  Tu choisis ensuite quelles propositions appliquer. Tes fichiers ne sont pas modifiés.
+                  {toSearch} titre(s) jamais cherché(s) : SCMusic envoie leur titre et artiste à musicbrainz.org (base musicale libre),
+                  un par seconde, environ {seconds} s. Les résultats sont gardés pour ne plus avoir à redemander. Tes fichiers ne sont pas modifiés.
                 </Txt>
-                <Button title="Lancer la recherche" icon="search" onPress={start} />
+                <Button title={done > cachedCount ? 'Reprendre la recherche' : 'Lancer la recherche'} icon="search" onPress={start} />
               </GlassCard>
             )}
             {running && <Button title="Arrêter" kind="ghost" icon="close" onPress={() => abort.current?.abort()} />}
-            {!running && done > 0 && done < tracks.length && <Button title="Reprendre" kind="ghost" icon="search" onPress={start} />}
           </View>
         }
         ListEmptyComponent={<EmptyState icon="disc" title="Aucun titre" text="Les titres choisis n'existent plus dans la bibliothèque." />}
@@ -147,6 +171,7 @@ export default function AlbumLookup() {
                 ) : res ? (
                   <Txt variant="muted">Rien de nouveau trouvé</Txt>
                 ) : null}
+                {res?.cached && <Txt variant="caption">déjà cherché</Txt>}
               </View>
               {res?.state === 'found' && (
                 <View style={[styles.check, on && styles.checkOn]}>{on && <Icon name="check" size={16} color={colors.bg} />}</View>

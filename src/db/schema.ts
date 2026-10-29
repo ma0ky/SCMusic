@@ -81,6 +81,19 @@ const MIGRATIONS: string[] = [
   ALTER TABLE tracks ADD COLUMN orig_album TEXT;
   ALTER TABLE tracks ADD COLUMN orig_track_no INTEGER;
   `,
+  // v6 : résultats des recherches d'album en ligne, gardés pour ne jamais redemander la même chose.
+  // album NULL = rien trouvé. query_* = titre / artiste envoyés : s'ils changent, une nouvelle recherche est permise.
+  `
+  CREATE TABLE IF NOT EXISTS album_lookups (
+    track_id     INTEGER PRIMARY KEY REFERENCES tracks(id) ON DELETE CASCADE,
+    query_title  TEXT NOT NULL,
+    query_artist TEXT NOT NULL,
+    album        TEXT,
+    track_no     INTEGER,
+    year         TEXT,
+    looked_up_at INTEGER NOT NULL
+  );
+  `,
 ];
 
 export async function migrate(): Promise<void> {
