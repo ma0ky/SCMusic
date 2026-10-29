@@ -12,8 +12,10 @@ import type { Playlist, Track } from '@/db/types';
 import { useLibrary } from '@/store/useLibrary';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { colors, space } from '@/theme/tokens';
+import { useT } from '@/i18n';
 
 export default function PlaylistScreen() {
+  const t = useT();
   const id = Number(useLocalSearchParams<{ id: string }>().id);
   const playTracks = usePlayerStore((s) => s.playTracks);
   const libraryChanged = usePlayerStore((s) => s.libraryChanged);
@@ -34,19 +36,19 @@ export default function PlaylistScreen() {
   };
   const move = (from: number, to: number) => {
     if (to < 0 || to >= tracks.length) return;
-    const ids = tracks.map((t) => t.id);
+    const ids = tracks.map((track) => track.id);
     const [m] = ids.splice(from, 1);
     ids.splice(to, 0, m);
     save(ids);
   };
-  const removeAt = (index: number) => save(tracks.filter((_, i) => i !== index).map((t) => t.id));
+  const removeAt = (index: number) => save(tracks.filter((_, i) => i !== index).map((track) => track.id));
 
   const confirmDelete = () => {
     setMenu(false);
-    Alert.alert('Supprimer la playlist ?', `« ${info?.name} » sera supprimée. Les morceaux restent dans ta bibliothèque.`, [
-      { text: 'Annuler', style: 'cancel' },
+    Alert.alert(t.playlists.deleteConfirm, t.playlists.deleteText(info?.name ?? ''), [
+      { text: t.common.cancel, style: 'cancel' },
       {
-        text: 'Supprimer',
+        text: t.common.delete,
         style: 'destructive',
         onPress: async () => {
           await deletePlaylist(id);
@@ -61,11 +63,11 @@ export default function PlaylistScreen() {
     <Screen>
       <DetailHeader
         title={info?.name ?? ''}
-        subtitle={`${tracks.length} titre${tracks.length > 1 ? 's' : ''}`}
+        subtitle={t.common.tracks(tracks.length)}
         right={
           editing
             ? <Button title="OK" onPress={() => setEditing(false)} />
-            : <IconButton name="more" label="Options de la playlist" onPress={() => setMenu(true)} />
+            : <IconButton name="more" label={t.playlists.options} onPress={() => setMenu(true)} />
         }
       />
       <TrackList
@@ -73,35 +75,35 @@ export default function PlaylistScreen() {
         header={
           tracks.length > 0 && !editing ? (
             <View style={{ padding: space.md }}>
-              <Button title="Lire la playlist" icon="play" onPress={() => playTracks(tracks)} />
+              <Button title={t.playlists.play} icon="play" onPress={() => playTracks(tracks)} />
             </View>
           ) : undefined
         }
-        empty={<EmptyState icon="playlist" title="Playlist vide" text="Ajoute des titres depuis le menu … d'un morceau." />}
+        empty={<EmptyState icon="playlist" title={t.playlists.empty} text={t.playlists.emptyText} />}
         renderRight={
           editing
             ? (_t, i) => (
                 <View style={{ flexDirection: 'row' }}>
-                  <IconButton name="up" label="Monter" onPress={() => move(i, i - 1)} color={i === 0 ? colors.textFaint : colors.text} />
-                  <IconButton name="down" label="Descendre" onPress={() => move(i, i + 1)} color={i === tracks.length - 1 ? colors.textFaint : colors.text} />
-                  <IconButton name="trash" label="Retirer" onPress={() => removeAt(i)} color={colors.danger} />
+                  <IconButton name="up" label={t.common.moveUp} onPress={() => move(i, i - 1)} color={i === 0 ? colors.textFaint : colors.text} />
+                  <IconButton name="down" label={t.common.moveDown} onPress={() => move(i, i + 1)} color={i === tracks.length - 1 ? colors.textFaint : colors.text} />
+                  <IconButton name="trash" label={t.common.remove} onPress={() => removeAt(i)} color={colors.danger} />
                 </View>
               )
             : undefined
         }
-        menuExtra={(t, close) => (
-          <SheetItem icon="trash" label="Retirer de la playlist" danger onPress={() => { removeAt(tracks.indexOf(t)); close(); }} />
+        menuExtra={(track, close) => (
+          <SheetItem icon="trash" label={t.playlists.removeFrom} danger onPress={() => { removeAt(tracks.indexOf(track)); close(); }} />
         )}
       />
 
       <Sheet visible={menu} onClose={() => setMenu(false)} title={info?.name}>
-        <SheetItem icon="edit" label="Renommer" onPress={() => { setMenu(false); setRenaming(true); }} />
-        <SheetItem icon="up" label="Réorganiser / retirer des titres" onPress={() => { setMenu(false); setEditing(true); }} />
-        <SheetItem icon="trash" label="Supprimer la playlist" danger onPress={confirmDelete} />
+        <SheetItem icon="edit" label={t.common.rename} onPress={() => { setMenu(false); setRenaming(true); }} />
+        <SheetItem icon="up" label={t.playlists.reorder} onPress={() => { setMenu(false); setEditing(true); }} />
+        <SheetItem icon="trash" label={t.playlists.delete} danger onPress={confirmDelete} />
       </Sheet>
       <PromptSheet
         visible={renaming}
-        title="Renommer la playlist"
+        title={t.playlists.renameTitle}
         initial={info?.name}
         onClose={() => setRenaming(false)}
         onSubmit={async (name) => {

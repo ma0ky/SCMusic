@@ -1,5 +1,6 @@
 // Comptage des écoutes (logique pure, testée) : combien de secondes ont vraiment été écoutées,
 // et à partir de quand un morceau compte comme "écouté".
+import { tr } from '@/i18n';
 
 /** Une écoute compte après 30 s (ou la moitié d'un morceau très court), comme sur la plupart des services. */
 export const COUNT_AFTER = 30;
@@ -55,8 +56,6 @@ export interface Buckets {
   labels: string[]; // libellés courts pour l'axe
 }
 
-const DAYS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
-const MONTHS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
 /** Pour "Depuis toujours", au plus 3 ans de mois sur le graphique. */
 const MAX_MONTHS = 36;
 
@@ -64,16 +63,18 @@ const pad = (n: number) => String(n).padStart(2, '0');
 export const dayKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 export const monthKey = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
 
-/** "2026-10-28" → "mar. 28 oct." ; "2026-10" → "oct. 2026" (pour les infobulles). */
+/** "2026-10-28" → "mer. 28 oct." ; "2026-10" → "oct. 2026" (pour les infobulles, dans la langue choisie). */
 export function longLabel(key: string): string {
+  const { days, months, dayLabel } = tr().dates;
   const [y, m, d] = key.split('-').map(Number);
-  if (d == null) return `${MONTHS[m - 1]} ${y}`;
+  if (d == null) return `${months[m - 1]} ${y}`;
   const date = new Date(y, m - 1, d);
-  return `${DAYS[date.getDay()]} ${d} ${MONTHS[m - 1]}`;
+  return dayLabel(days[date.getDay()], d, months[m - 1]);
 }
 
 /** Cases du graphique pour une période, à partir de maintenant (heure locale). */
 export function bucketsFor(period: Period, now: Date, firstPlay: number | null): Buckets {
+  const { days, months: monthNames } = tr().dates;
   if (period === 'week' || period === 'month') {
     const count = period === 'week' ? 7 : 30;
     const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (count - 1));
@@ -82,7 +83,7 @@ export function bucketsFor(period: Period, now: Date, firstPlay: number | null):
     for (let i = 0; i < count; i++) {
       const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
       keys.push(dayKey(d));
-      labels.push(period === 'week' ? DAYS[d.getDay()] : String(d.getDate()));
+      labels.push(period === 'week' ? days[d.getDay()] : String(d.getDate()));
     }
     return { since: start.getTime(), unit: 'day', keys, labels };
   }
@@ -98,7 +99,7 @@ export function bucketsFor(period: Period, now: Date, firstPlay: number | null):
   for (let i = 0; i < months; i++) {
     const d = new Date(start.getFullYear(), start.getMonth() + i, 1);
     keys.push(monthKey(d));
-    labels.push(MONTHS[d.getMonth()]);
+    labels.push(monthNames[d.getMonth()]);
   }
   return { since: period === 'all' ? 0 : start.getTime(), unit: 'month', keys, labels };
 }
@@ -116,5 +117,5 @@ export function formatListening(seconds: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   if (h === 0) return `${m} min`;
-  return m ? `${h} h ${pad(m)} min` : `${h} h`;
+  return m ? tr().dates.hours(h, pad(m)) : tr().dates.hoursOnly(h);
 }

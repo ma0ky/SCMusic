@@ -2,6 +2,7 @@
 // de les afficher sur l'écran verrouillé et dans la notification de lecture.
 import { Directory, File, Paths } from 'expo-file-system';
 import { sniffImageMime, type EmbeddedPicture } from './tags';
+import { tr } from '@/i18n';
 
 /** Noms d'images de dossier reconnus (comparaison sans majuscules). */
 export const FOLDER_COVER_NAMES = ['cover', 'folder', 'front', 'album', 'albumart'];
@@ -71,10 +72,10 @@ export function imageSize(data: Uint8Array): { width: number; height: number } |
 
 /** Lève une erreur si l'image est trop lourde ou trop grande pour être affichée sans risque. */
 export function checkCover(data: Uint8Array): void {
-  if (data.length > MAX_COVER_BYTES) throw new Error('Image trop lourde (15 Mo maximum).');
+  if (data.length > MAX_COVER_BYTES) throw new Error(tr().errors.imageTooHeavy);
   const size = imageSize(data);
-  if (!size || size.width <= 0 || size.height <= 0) throw new Error("Ce fichier n'est pas une image JPEG ou PNG valide.");
-  if (size.width * size.height > MAX_COVER_PIXELS) throw new Error('Image trop grande (environ 7000 × 7000 pixels maximum).');
+  if (!size || size.width <= 0 || size.height <= 0) throw new Error(tr().errors.notAnImage);
+  if (size.width * size.height > MAX_COVER_PIXELS) throw new Error(tr().errors.imageTooLarge);
 }
 
 /** Enregistre une image et renvoie son URI file://. Ne réécrit pas une image déjà connue. */
@@ -91,7 +92,7 @@ export async function saveCover(picture: EmbeddedPicture): Promise<string> {
 
 /** Copie une image du téléphone (sélecteur ou dossier musique) vers les pochettes. */
 export async function saveCoverFromFile(source: File): Promise<string> {
-  if (source.size > MAX_COVER_BYTES) throw new Error('Image trop lourde (15 Mo maximum).');
+  if (source.size > MAX_COVER_BYTES) throw new Error(tr().errors.imageTooHeavy);
   const data = await source.bytes();
   return saveCover({ mime: sniffImageMime(data, source.name), data });
 }

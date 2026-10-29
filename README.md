@@ -20,6 +20,7 @@ Chaque requête est coupée dès la réponse (15 s maximum), et **Réglages → 
 - **Trouver les albums en ligne** : Bibliothèque → crayon → cocher des titres → loupe, ou bouton sur l'album « Album inconnu ». SCMusic interroge [MusicBrainz](https://musicbrainz.org) (un titre par seconde), propose l'album le plus probable (album studio plutôt que compilation, single ou bande originale) et le n° de piste ; tu coches ce que tu appliques. Chaque résultat (même « rien trouvé ») est gardé sur le téléphone : un titre déjà cherché n'est jamais redemandé, sauf si tu changes son titre ou son artiste
 - **Recherche** : titres, artistes et albums (accents et majuscules ignorés)
 - **Partage** : export / import de playlists entre deux téléphones, dans le respect du droit d'auteur (voir plus bas)
+- **Français ou anglais** : Réglages → *Langue / Language*, sans redémarrer. Les textes sont dans [src/i18n/](src/i18n/) (`fr.ts` sert de référence, `en.ts` doit avoir les mêmes clés). Les données de la bibliothèque (titres, « Artiste inconnu » des fichiers sans tags) ne sont pas traduites
 
 ## Compiler et installer (100 % local, sans store ni cloud)
 

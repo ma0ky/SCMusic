@@ -3,6 +3,7 @@
 import { normalize } from '@/search/search';
 import type { Track, TrackLicense } from '@/db/types';
 import { cleanField } from '@/library/trackInfo';
+import { tr } from '@/i18n';
 
 export const SHARE_FORMAT = 'scmusic-share';
 export const SHARE_VERSION = 1;
@@ -108,24 +109,24 @@ export function parseManifest(json: string): ShareManifest {
   try {
     data = JSON.parse(json);
   } catch {
-    throw new Error("Le fichier n'est pas un JSON valide.");
+    throw new Error(tr().errors.notJson);
   }
   const m = data as Partial<ShareManifest>;
   if (m?.format !== SHARE_FORMAT || !Array.isArray(m.playlists)) {
-    throw new Error("Ce fichier n'est pas un export SCMusic.");
+    throw new Error(tr().errors.notExport);
   }
   if (typeof m.version !== 'number' || m.version > SHARE_VERSION) {
-    throw new Error('Export créé par une version plus récente de SCMusic.');
+    throw new Error(tr().errors.newerExport);
   }
-  if (m.playlists.length > MAX_PLAYLISTS) throw new Error(`Trop de playlists dans ce fichier (${MAX_PLAYLISTS} maximum).`);
+  if (m.playlists.length > MAX_PLAYLISTS) throw new Error(tr().errors.tooManyPlaylists(MAX_PLAYLISTS));
   const licenses: TrackLicense[] = ['personal', 'own', 'cc'];
   // Les textes reçus sont nettoyés comme une saisie à la main (caractères invisibles, longueur)
   const text = (v: unknown) => cleanField(typeof v === 'string' ? v : '');
   const playlists = m.playlists.map((p) => {
     const tracks = Array.isArray(p?.tracks) ? p.tracks : [];
-    if (tracks.length > MAX_TRACKS_PER_PLAYLIST) throw new Error(`Playlist trop longue (${MAX_TRACKS_PER_PLAYLIST} titres maximum).`);
+    if (tracks.length > MAX_TRACKS_PER_PLAYLIST) throw new Error(tr().errors.playlistTooLong(MAX_TRACKS_PER_PLAYLIST));
     return {
-      name: (text(p?.name) || 'Playlist importée').slice(0, 100),
+      name: (text(p?.name) || tr().playlists.imported).slice(0, 100),
       tracks: tracks.map((t) => ({
         title: text(t?.title),
         artist: text(t?.artist),

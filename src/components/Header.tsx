@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { colors, layout, space } from '@/theme/tokens';
 import { IconButton, Txt } from './ui';
+import { useT } from '@/i18n';
 
 export function PageTitle({ title, right }: { title: string; right?: ReactNode }) {
   return (
@@ -21,9 +22,10 @@ export function DetailHeader({ title, subtitle, right, icon = 'back', onBack }: 
   icon?: 'back' | 'down';
   onBack?: () => void; // par défaut : écran précédent
 }) {
+  const t = useT();
   return (
     <View style={styles.detail}>
-      <IconButton name={icon} label="Retour" onPress={onBack ?? (() => (router.canGoBack() ? router.back() : router.replace('/')))} />
+      <IconButton name={icon} label={t.common.back} onPress={onBack ?? (() => (router.canGoBack() ? router.back() : router.replace('/')))} />
       <View style={{ flex: 1 }}>
         <Txt variant="heading" numberOfLines={1}>{title}</Txt>
         {subtitle ? <Txt variant="muted" numberOfLines={1}>{subtitle}</Txt> : null}

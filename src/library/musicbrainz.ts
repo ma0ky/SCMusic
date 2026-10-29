@@ -5,6 +5,7 @@ import Constants from 'expo-constants';
 import type { Track } from '@/db/types';
 import { netFetch, OfflineError, readJson } from '@/net/network';
 import { normalize } from '@/search/search';
+import { tr } from '@/i18n';
 
 const SEARCH_URL = 'https://musicbrainz.org/ws/2/recording/';
 /** Pause entre deux requêtes (règle d'usage de MusicBrainz : 1 par seconde). */
@@ -120,8 +121,8 @@ export async function findAlbumOnline(
     if (delay == null || signal?.aborted) break;
     await wait(delay, signal);
   }
-  if (signal?.aborted) throw new Error('Recherche arrêtée.');
-  throw new Error('MusicBrainz est surchargé, réessaie dans un moment.');
+  if (signal?.aborted) throw new Error(tr().errors.searchStopped);
+  throw new Error(tr().errors.busy('MusicBrainz'));
 }
 
 async function requestAlbum(
@@ -143,11 +144,11 @@ async function requestAlbum(
     });
   } catch (e) {
     if (e instanceof OfflineError) throw e;
-    if (signal?.aborted) throw new Error('Recherche arrêtée.');
-    throw new Error('Pas de connexion à Internet, ou MusicBrainz ne répond pas.');
+    if (signal?.aborted) throw new Error(tr().errors.searchStopped);
+    throw new Error(tr().errors.noConnection('MusicBrainz'));
   }
   if (res.status === 503 || res.status === 429) return 'busy';
-  if (!res.ok) throw new Error(`MusicBrainz a répondu une erreur (${res.status}).`);
+  if (!res.ok) throw new Error(tr().errors.httpError('MusicBrainz', res.status));
   const data = await readJson<{ recordings?: MbRecording[] }>(res);
   return pickAlbum(Array.isArray(data?.recordings) ? data.recordings : [], track);
 }

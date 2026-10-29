@@ -3,6 +3,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { addToPlaylist, allTracks, createPlaylist, insertTrack, trackByUri } from '@/db/queries';
 import { looksLikeAudio, MANIFEST_NAME, MAX_AUDIO_BYTES, MAX_MANIFEST_BYTES, matchTracks, parseManifest, type ShareManifest } from './format';
+import { tr } from '@/i18n';
 
 export interface ImportResult {
   playlists: number;
@@ -59,7 +60,7 @@ async function applyManifest(manifest: ShareManifest, folder: Directory | null):
 
 /** Lit le fichier de partage après avoir vérifié sa taille. */
 async function readManifest(file: File): Promise<ShareManifest> {
-  if (file.size > MAX_MANIFEST_BYTES) throw new Error('Fichier de partage trop volumineux (5 Mo maximum).');
+  if (file.size > MAX_MANIFEST_BYTES) throw new Error(tr().errors.shareTooBig);
   return parseManifest(await file.text());
 }
 
@@ -67,7 +68,7 @@ async function readManifest(file: File): Promise<ShareManifest> {
 export async function importFromFolder(): Promise<ImportResult> {
   const folder = await Directory.pickDirectoryAsync();
   const manifestFile = folder.list().find((e): e is File => e instanceof File && e.name === MANIFEST_NAME);
-  if (!manifestFile) throw new Error(`Aucun fichier ${MANIFEST_NAME} dans ce dossier.`);
+  if (!manifestFile) throw new Error(tr().errors.noManifest(MANIFEST_NAME));
   return applyManifest(await readManifest(manifestFile), folder);
 }
 

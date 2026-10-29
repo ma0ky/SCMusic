@@ -15,6 +15,7 @@ import { EmptyState, formatTime, GlassCard, IconButton, Txt } from '@/components
 import { getPlayer } from '@/player/engine';
 import { useCurrentTrack, usePlayerStore } from '@/store/usePlayerStore';
 import { colors, layout, radius, space } from '@/theme/tokens';
+import { useT } from '@/i18n';
 
 /** Pochette du morceau, ou à défaut un motif généré à partir du titre. */
 function Artwork({ seed, coverUri }: { seed: string; coverUri: string | null }) {
@@ -36,6 +37,7 @@ function Artwork({ seed, coverUri }: { seed: string; coverUri: string | null }) 
 
 export default function Player() {
   const insets = useSafeAreaInsets();
+  const t = useT();
   const track = useCurrentTrack();
   const status = useAudioPlayerStatus(getPlayer());
   const s = usePlayerStore();
@@ -46,8 +48,8 @@ export default function Player() {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
         <Background />
-        <DetailHeader title="Lecteur" icon="down" />
-        <EmptyState icon="play" title="Rien en lecture" text="Choisis un morceau dans ta bibliothèque." />
+        <DetailHeader title={t.player.title} icon="down" />
+        <EmptyState icon="play" title={t.common.nothingPlaying} text={t.player.pickTrack} />
       </View>
     );
   }
@@ -59,18 +61,18 @@ export default function Player() {
     <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom + space.lg }]}>
       <Background />
       <DetailHeader
-        title="En lecture"
+        title={t.player.nowPlaying}
         subtitle={`${s.queue.index + 1} / ${s.queue.order.length}`}
         icon="down"
         right={
           <>
             <IconButton
               name="lyrics"
-              label={showLyrics ? 'Masquer les paroles' : 'Afficher les paroles'}
+              label={showLyrics ? t.player.hideLyrics : t.player.showLyrics}
               active={showLyrics}
               onPress={() => setShowLyrics(!showLyrics)}
             />
-            <IconButton name="queue" label="File d'attente" onPress={() => router.push('/queue')} />
+            <IconButton name="queue" label={t.queue.title} onPress={() => router.push('/queue')} />
           </>
         }
       />
@@ -88,7 +90,7 @@ export default function Player() {
           </View>
           <IconButton
             name={track.liked ? 'heartFill' : 'heart'}
-            label={track.liked ? 'Ne plus aimer' : 'Aimer'}
+            label={track.liked ? t.player.unlike : t.common.like}
             color={track.liked ? colors.liked : colors.text}
             size={26}
             onPress={() => s.toggleLike(track)}
@@ -96,7 +98,7 @@ export default function Player() {
         </View>
 
         <View>
-          <SeekBar value={status.currentTime} max={duration} onChange={s.seek} onPreview={setPreview} label="Position dans le morceau" />
+          <SeekBar value={status.currentTime} max={duration} onChange={s.seek} onPreview={setPreview} label={t.player.position} />
           <View style={styles.times}>
             <Txt variant="muted">{formatTime(preview ?? status.currentTime)}</Txt>
             <Txt variant="muted">{formatTime(duration)}</Txt>
@@ -104,17 +106,17 @@ export default function Player() {
         </View>
 
         <View style={styles.controls}>
-          <IconButton name="shuffle" label="Aléatoire" active={s.queue.shuffle} onPress={s.toggleShuffle} />
-          <IconButton name="prev" label="Précédent" size={30} onPress={s.previous} />
-          <IconButton name={status.playing ? 'pause' : 'play'} label={status.playing ? 'Pause' : 'Lecture'} size={30} big onPress={s.togglePlay} />
-          <IconButton name="next" label="Suivant" size={30} onPress={s.next} />
-          <IconButton name={repeatIcon} label={`Répétition : ${s.queue.repeat}`} active={s.queue.repeat !== 'off'} onPress={s.cycleRepeat} />
+          <IconButton name="shuffle" label={t.common.shuffle} active={s.queue.shuffle} onPress={s.toggleShuffle} />
+          <IconButton name="prev" label={t.common.previous} size={30} onPress={s.previous} />
+          <IconButton name={status.playing ? 'pause' : 'play'} label={status.playing ? t.common.pause : t.common.play} size={30} big onPress={s.togglePlay} />
+          <IconButton name="next" label={t.common.next} size={30} onPress={s.next} />
+          <IconButton name={repeatIcon} label={t.player.repeat[s.queue.repeat]} active={s.queue.repeat !== 'off'} onPress={s.cycleRepeat} />
         </View>
 
         <View style={styles.volume}>
           <Icon name="volume" size={18} color={colors.textMuted} />
           <View style={{ flex: 1 }}>
-            <SeekBar value={s.volume} max={1} onChange={s.setVolume} onPreview={(v) => v != null && s.setVolume(v)} label="Volume" />
+            <SeekBar value={s.volume} max={1} onChange={s.setVolume} onPreview={(v) => v != null && s.setVolume(v)} label={t.player.volume} />
           </View>
         </View>
       </View>

@@ -7,25 +7,27 @@ import { useCurrentTrack, usePlayerStore } from '@/store/usePlayerStore';
 import { colors, layout, space } from '@/theme/tokens';
 import { Cover } from './Cover';
 import { GlassCard, IconButton, Txt } from './ui';
+import { useT } from '@/i18n';
 
 export function MiniPlayer() {
   const track = useCurrentTrack();
   const status = useAudioPlayerStatus(getPlayer());
   const togglePlay = usePlayerStore((s) => s.togglePlay);
   const next = usePlayerStore((s) => s.next);
+  const t = useT();
   if (!track) return null;
 
   const pct = status.duration > 0 ? (status.currentTime / status.duration) * 100 : 0;
   return (
     <GlassCard strong style={styles.card}>
-      <Pressable style={styles.row} onPress={() => router.push('/player')} accessibilityLabel="Ouvrir le lecteur">
+      <Pressable style={styles.row} onPress={() => router.push('/player')} accessibilityLabel={t.player.open}>
         <Cover uri={track.coverUri} size={44} />
         <View style={styles.text}>
           <Txt numberOfLines={1}>{track.title}</Txt>
           <Txt variant="muted" numberOfLines={1}>{track.artist}</Txt>
         </View>
-        <IconButton name={status.playing ? 'pause' : 'play'} label={status.playing ? 'Pause' : 'Lecture'} onPress={togglePlay} />
-        <IconButton name="next" label="Suivant" onPress={next} />
+        <IconButton name={status.playing ? 'pause' : 'play'} label={status.playing ? t.common.pause : t.common.play} onPress={togglePlay} />
+        <IconButton name="next" label={t.common.next} onPress={next} />
       </Pressable>
       <View style={styles.progress}>
         <View style={[styles.progressFill, { width: `${pct}%` }]} />

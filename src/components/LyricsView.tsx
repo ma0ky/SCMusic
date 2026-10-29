@@ -11,6 +11,7 @@ import { activeLineIndex, parseLyrics, type Lyrics } from '@/library/lyrics';
 import { colors, font, space } from '@/theme/tokens';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { Button, EmptyState, GlassCard, Txt } from './ui';
+import { useT } from '@/i18n';
 
 /** Durée pendant laquelle le défilement manuel l'emporte sur le suivi automatique. */
 const MANUAL_SCROLL_MS = 3000;
@@ -23,6 +24,7 @@ interface Props {
 }
 
 export function LyricsView({ track, position, onSeek, style }: Props) {
+  const t = useT();
   const trackId = track.id;
   const libraryVersion = usePlayerStore((s) => s.libraryVersion); // rechargées après une modification
   const libraryChanged = usePlayerStore((s) => s.libraryChanged);
@@ -59,29 +61,29 @@ export function LyricsView({ track, position, onSeek, style }: Props) {
     try {
       const result = await searchLyricsOnline(track, force);
       if (result.kind === 'already') {
-        Alert.alert('Déjà cherché', `LRCLIB n'avait rien pour « ${track.title} » le ${formatDay(result.at)}. Pour ne pas redemander, rien n'a été envoyé.`, [
-          { text: 'Coller', onPress: () => router.push('/lyrics-edit') },
-          { text: 'Annuler', style: 'cancel' },
-          { text: 'Chercher quand même', onPress: () => searchOnline(true) },
+        Alert.alert(t.lyrics.already, t.lyrics.alreadyText(track.title, formatDay(result.at)), [
+          { text: t.lyrics.paste, onPress: () => router.push('/lyrics-edit') },
+          { text: t.common.cancel, style: 'cancel' },
+          { text: t.lyrics.searchAnyway, onPress: () => searchOnline(true) },
         ]);
       } else if (result.kind === 'found') {
         const found = result.lyrics;
         await setTrackLyrics(track.id, found.text);
         libraryChanged();
         if (!found.synced) {
-          Alert.alert('Texte trouvé, sans synchro', `Source : ${found.source}`, [
-            { text: 'Plus tard', style: 'cancel' },
-            { text: 'Synchroniser', onPress: () => router.push('/lyrics-edit') },
+          Alert.alert(t.lyrics.foundPlain, t.lyrics.source(found.source), [
+            { text: t.common.later, style: 'cancel' },
+            { text: t.lyrics.sync, onPress: () => router.push('/lyrics-edit') },
           ]);
         }
       } else {
-        Alert.alert('Rien trouvé', `Pas de paroles sur LRCLIB pour « ${track.title} ». Tu peux les coller depuis un site.`, [
-          { text: 'Annuler', style: 'cancel' },
-          { text: 'Coller', onPress: () => router.push('/lyrics-edit') },
+        Alert.alert(t.lyrics.notFound, t.lyrics.notFoundPaste(track.title), [
+          { text: t.common.cancel, style: 'cancel' },
+          { text: t.lyrics.paste, onPress: () => router.push('/lyrics-edit') },
         ]);
       }
     } catch (e) {
-      Alert.alert('Recherche impossible', e instanceof Error ? e.message : String(e));
+      Alert.alert(t.lyrics.searchFailed, e instanceof Error ? e.message : String(e));
     } finally {
       setSearching(false);
     }
@@ -91,10 +93,10 @@ export function LyricsView({ track, position, onSeek, style }: Props) {
   if (!lyrics || lyrics.lines.length === 0) {
     return (
       <GlassCard style={[styles.card, style]}>
-        <EmptyState icon="lyrics" title="Pas de paroles" text="Cherche-les en ligne, colle-les depuis un site, ou ajoute un fichier nom.lrc à côté de nom.mp3.">
+        <EmptyState icon="lyrics" title={t.lyrics.none} text={t.lyrics.noneText}>
           <View style={styles.actions}>
-            <Button title={searching ? 'Recherche…' : 'Chercher en ligne'} icon="search" onPress={() => searchOnline()} disabled={searching} />
-            <Button title="Coller / écrire" kind="ghost" icon="edit" onPress={() => router.push('/lyrics-edit')} />
+            <Button title={searching ? t.common.searching : t.lyrics.searchOnline} icon="search" onPress={() => searchOnline()} disabled={searching} />
+            <Button title={t.lyrics.pasteOrWrite} kind="ghost" icon="edit" onPress={() => router.push('/lyrics-edit')} />
           </View>
         </EmptyState>
       </GlassCard>
@@ -124,7 +126,7 @@ export function LyricsView({ track, position, onSeek, style }: Props) {
                     onSeek(line.time!);
                   }}
                   accessibilityRole="button"
-                  accessibilityLabel={`Aller à : ${line.text || 'pause instrumentale'}`}
+                  accessibilityLabel={t.lyrics.goTo(line.text)}
                 >
                   <Txt style={[styles.synced, past && styles.past, current && styles.current]}>{text}</Txt>
                 </Pressable>
@@ -135,9 +137,9 @@ export function LyricsView({ track, position, onSeek, style }: Props) {
           );
         })}
         <View style={styles.footer}>
-          {!lyrics.synced ? <Txt variant="muted" style={styles.note}>Paroles non synchronisées</Txt> : null}
+          {!lyrics.synced ? <Txt variant="muted" style={styles.note}>{t.lyrics.notSynced}</Txt> : null}
           <Button
-            title={lyrics.synced ? 'Modifier les paroles' : 'Synchroniser au doigt'}
+            title={lyrics.synced ? t.lyrics.edit : t.lyrics.syncByHand}
             kind={lyrics.synced ? 'ghost' : 'primary'}
             icon="edit"
             onPress={() => router.push('/lyrics-edit')}

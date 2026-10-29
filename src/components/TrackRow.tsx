@@ -8,6 +8,7 @@ import { colors, layout, radius, space } from '@/theme/tokens';
 import { Cover } from './Cover';
 import { Icon } from './Icon';
 import { formatTime, IconButton, Txt } from './ui';
+import { useT } from '@/i18n';
 
 export function TrackRow({
   track, onPress, onMore, right, subtitle, selected,
@@ -19,6 +20,7 @@ export function TrackRow({
   subtitle?: string;
   selected?: boolean;
 }) {
+  const t = useT();
   const playing = useCurrentTrack();
   const isCurrent = playing?.id === track.id;
   return (
@@ -43,7 +45,7 @@ export function TrackRow({
           {selected && <Icon name="check" size={16} color={colors.bg} />}
         </View>
       ) : (
-        onMore && <IconButton name="more" label="Actions" onPress={onMore} color={colors.textMuted} />
+        onMore && <IconButton name="more" label={t.common.actions} onPress={onMore} color={colors.textMuted} />
       )}
     </Pressable>
   );

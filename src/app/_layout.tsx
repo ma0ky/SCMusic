@@ -7,14 +7,17 @@ import { migrate } from '@/db/schema';
 import { Txt } from '@/components/ui';
 import { colors } from '@/theme/tokens';
 import { UpdateProgress, useUpdater } from '@/update/useUpdater';
+import { useT } from '@/i18n';
+import { loadLanguage } from '@/i18n/storage';
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const updater = useUpdater();
+  const t = useT();
 
   useEffect(() => {
-    migrate().then(() => setReady(true)).catch((e) => setError(String(e)));
+    migrate().then(loadLanguage).then(() => setReady(true)).catch((e) => setError(String(e)));
   }, []);
 
   // Une fois la base prête : nouvelle version publiée ? (au plus une fois par jour)
@@ -26,7 +29,7 @@ export default function RootLayout() {
   if (!ready) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        {error ? <Txt style={{ color: colors.danger }}>Erreur base de données : {error}</Txt> : <ActivityIndicator color={colors.accent} />}
+        {error ? <Txt style={{ color: colors.danger }}>{t.errors.dbError(error)}</Txt> : <ActivityIndicator color={colors.accent} />}
       </View>
     );
   }

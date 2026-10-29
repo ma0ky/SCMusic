@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { colors, font, radius, space } from '@/theme/tokens';
 import { Txt } from './ui';
+import { useT } from '@/i18n';
 
 interface Props {
   values: number[];
@@ -17,6 +18,7 @@ const MAX_LABELS = 7;
 const LABEL_WIDTH = 44;
 
 export function BarChart({ values, labels, describe, height = 140 }: Props) {
+  const t = useT();
   const [selected, setSelected] = useState<number | null>(null);
   const max = Math.max(...values, 0);
   const every = Math.ceil(values.length / MAX_LABELS);
@@ -24,7 +26,7 @@ export function BarChart({ values, labels, describe, height = 140 }: Props) {
   return (
     <View>
       <Txt variant="muted" style={styles.tooltip} numberOfLines={1}>
-        {selected != null ? describe(selected) : 'Touche une barre pour voir le détail'}
+        {selected != null ? describe(selected) : t.stats.tapBar}
       </Txt>
       <View style={[styles.plot, { height }]}>
         {values.map((v, i) => {

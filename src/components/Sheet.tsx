@@ -11,11 +11,13 @@ import { pickCoverImage } from '@/library/covers';
 import { Cover } from './Cover';
 import { Icon, type IconName } from './Icon';
 import { Button, GlassCard, Txt } from './ui';
+import { useT } from '@/i18n';
 
 export function Sheet({ visible, onClose, title, children }: { visible: boolean; onClose: () => void; title?: string; children: ReactNode }) {
+  const t = useT();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Fermer" />
+      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={t.common.close} />
       <View style={styles.sheetWrap} pointerEvents="box-none">
         <GlassCard strong style={styles.sheet}>
           {title && <Txt variant="heading" numberOfLines={2} style={{ marginBottom: space.md }}>{title}</Txt>}
@@ -55,7 +57,8 @@ export function PromptSheet({ visible, title, onClose, ...rest }: PromptProps) {
   );
 }
 
-function PromptBody({ initial = '', confirmLabel = 'Valider', onSubmit, onClose }: Omit<PromptProps, 'visible' | 'title'>) {
+function PromptBody({ initial = '', confirmLabel, onSubmit, onClose }: Omit<PromptProps, 'visible' | 'title'>) {
+  const t = useT();
   const [value, setValue] = useState(initial);
   const ok = value.trim().length > 0;
   return (
@@ -65,24 +68,20 @@ function PromptBody({ initial = '', confirmLabel = 'Valider', onSubmit, onClose 
         onChangeText={setValue}
         autoFocus
         maxLength={100}
-        placeholder="Nom"
+        placeholder={t.common.name}
         placeholderTextColor={colors.textFaint}
         style={styles.input}
         onSubmitEditing={() => ok && onSubmit(value.trim())}
       />
       <View style={styles.actions}>
-        <Button title="Annuler" kind="ghost" onPress={onClose} />
-        <Button title={confirmLabel} onPress={() => onSubmit(value.trim())} disabled={!ok} />
+        <Button title={t.common.cancel} kind="ghost" onPress={onClose} />
+        <Button title={confirmLabel ?? t.common.confirm} onPress={() => onSubmit(value.trim())} disabled={!ok} />
       </View>
     </>
   );
 }
 
-const LICENSES: { value: TrackLicense; label: string }[] = [
-  { value: 'personal', label: 'Achat / CD perso (non partageable)' },
-  { value: 'own', label: 'Ma création (partageable)' },
-  { value: 'cc', label: 'Licence libre, Creative Commons (partageable)' },
-];
+const LICENSES: TrackLicense[] = ['personal', 'own', 'cc'];
 
 /** Menu d'actions d'un morceau. `extra` permet à un écran d'ajouter ses propres actions. */
 type TrackMenuProps = { track: Track | null; onClose: () => void; extra?: ReactNode };
@@ -93,6 +92,7 @@ export function TrackMenu({ track, ...rest }: TrackMenuProps) {
 }
 
 function TrackMenuBody({ track, onClose, extra }: TrackMenuProps & { track: Track }) {
+  const t = useT();
   const { playNext, enqueue, toggleLike, changeLicense, changeCover, libraryChanged } = usePlayerStore.getState();
   const [mode, setMode] = useState<'main' | 'playlist' | 'license' | 'newPlaylist' | 'cover'>('main');
   const [lists, setLists] = useState<Playlist[]>([]);
@@ -107,7 +107,7 @@ function TrackMenuBody({ track, onClose, extra }: TrackMenuProps & { track: Trac
       if (uri) await changeCover(track, uri, wholeAlbum);
       done();
     } catch (e) {
-      Alert.alert('Image illisible', e instanceof Error ? e.message : String(e));
+      Alert.alert(t.menu.badImage, e instanceof Error ? e.message : String(e));
     }
   };
 
@@ -115,8 +115,8 @@ function TrackMenuBody({ track, onClose, extra }: TrackMenuProps & { track: Trac
     return (
       <PromptSheet
         visible
-        title="Nouvelle playlist"
-        confirmLabel="Créer"
+        title={t.common.newPlaylist}
+        confirmLabel={t.common.create}
         onClose={() => setMode('playlist')}
         onSubmit={async (name) => addTo(await createPlaylist(name))}
       />
@@ -127,26 +127,26 @@ function TrackMenuBody({ track, onClose, extra }: TrackMenuProps & { track: Trac
     <Sheet visible onClose={done} title={`${track.title}\n${track.artist}`}>
       {mode === 'main' && (
         <>
-          <SheetItem icon="queue" label="Lire ensuite" onPress={() => { playNext(track); done(); }} />
-          <SheetItem icon="plus" label="Ajouter à la file" onPress={() => { enqueue(track); done(); }} />
-          <SheetItem icon="playlist" label="Ajouter à une playlist" onPress={() => setMode('playlist')} />
+          <SheetItem icon="queue" label={t.menu.playNext} onPress={() => { playNext(track); done(); }} />
+          <SheetItem icon="plus" label={t.menu.enqueue} onPress={() => { enqueue(track); done(); }} />
+          <SheetItem icon="playlist" label={t.menu.addToPlaylist} onPress={() => setMode('playlist')} />
           <SheetItem
             icon={track.liked ? 'heartFill' : 'heart'}
-            label={track.liked ? 'Retirer des titres aimés' : 'Aimer'}
+            label={track.liked ? t.menu.unlike : t.common.like}
             active={track.liked}
             onPress={() => { toggleLike(track); done(); }}
           />
-          <SheetItem icon="disc" label="Voir l'album" onPress={() => { done(); router.push({ pathname: '/album/[id]', params: { id: track.album } }); }} />
-          <SheetItem icon="user" label="Voir l'artiste" onPress={() => { done(); router.push({ pathname: '/artist/[id]', params: { id: track.artist } }); }} />
-          <SheetItem icon="edit" label="Modifier les infos" onPress={() => { done(); router.push({ pathname: '/track-edit', params: { ids: String(track.id) } }); }} />
-          <SheetItem icon="image" label="Pochette" onPress={() => setMode('cover')} />
-          <SheetItem icon="edit" label="Licence du morceau" onPress={() => setMode('license')} />
+          <SheetItem icon="disc" label={t.menu.viewAlbum} onPress={() => { done(); router.push({ pathname: '/album/[id]', params: { id: track.album } }); }} />
+          <SheetItem icon="user" label={t.menu.viewArtist} onPress={() => { done(); router.push({ pathname: '/artist/[id]', params: { id: track.artist } }); }} />
+          <SheetItem icon="edit" label={t.menu.editInfo} onPress={() => { done(); router.push({ pathname: '/track-edit', params: { ids: String(track.id) } }); }} />
+          <SheetItem icon="image" label={t.menu.cover} onPress={() => setMode('cover')} />
+          <SheetItem icon="edit" label={t.menu.license} onPress={() => setMode('license')} />
           {extra}
         </>
       )}
       {mode === 'playlist' && (
         <ScrollView style={{ maxHeight: 360 }}>
-          <SheetItem icon="plus" label="Nouvelle playlist…" active onPress={() => setMode('newPlaylist')} />
+          <SheetItem icon="plus" label={t.menu.newPlaylist} active onPress={() => setMode('newPlaylist')} />
           {lists.map((p) => <SheetItem key={p.id} icon="playlist" label={p.name} onPress={() => addTo(p.id)} />)}
         </ScrollView>
       )}
@@ -155,25 +155,25 @@ function TrackMenuBody({ track, onClose, extra }: TrackMenuProps & { track: Trac
           <View style={{ alignItems: 'center', marginBottom: space.md }}>
             <Cover uri={track.coverUri} size={120} rounded={radius.md} />
           </View>
-          <SheetItem icon="image" label="Choisir une image pour ce titre" onPress={() => chooseCover(false)} />
-          <SheetItem icon="disc" label={`Choisir une image pour tout l'album « ${track.album} »`} onPress={() => chooseCover(true)} />
+          <SheetItem icon="image" label={t.menu.coverTrack} onPress={() => chooseCover(false)} />
+          <SheetItem icon="disc" label={t.menu.coverAlbum(track.album)} onPress={() => chooseCover(true)} />
           {track.coverUri && (
-            <SheetItem icon="trash" label="Retirer la pochette" danger onPress={() => { changeCover(track, null, false); done(); }} />
+            <SheetItem icon="trash" label={t.menu.removeCover} danger onPress={() => { changeCover(track, null, false); done(); }} />
           )}
         </>
       )}
       {mode === 'license' && (
         <>
           <Txt variant="muted" style={{ marginBottom: space.sm }}>
-            Seuls les morceaux « Ma création » ou « Licence libre » peuvent être exportés vers une autre personne.
+            {t.menu.licenseNote}
           </Txt>
           {LICENSES.map((l) => (
             <SheetItem
-              key={l.value}
-              icon={track.license === l.value ? 'heartFill' : 'disc'}
-              label={l.label}
-              active={track.license === l.value}
-              onPress={() => { changeLicense(track, l.value); done(); }}
+              key={l}
+              icon={track.license === l ? 'heartFill' : 'disc'}
+              label={t.menu.licenses[l]}
+              active={track.license === l}
+              onPress={() => { changeLicense(track, l); done(); }}
             />
           ))}
         </>

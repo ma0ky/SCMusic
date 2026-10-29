@@ -17,20 +17,24 @@ import { colors, layout, radius, space } from '@/theme/tokens';
 import { isOfflineMode, setOfflineMode } from '@/net/network';
 import { currentVersion, getAutoCheck, getWifiOnly, setAutoCheck, setWifiOnly } from '@/update/updater';
 import { UpdateProgress, useUpdater } from '@/update/useUpdater';
+import { LANGS, tr, useLang, useT } from '@/i18n';
+import { saveLanguage } from '@/i18n/storage';
 
 /** Affiche un chemin SAF lisible : "content://…/tree/primary%3AMusic" → "Music". */
-function readableDir(uri: string | null): string {
-  if (!uri) return 'Aucun dossier choisi';
+function readableDir(uri: string | null): string | null {
+  if (!uri) return null;
   const last = decodeURIComponent(uri).split(/[/:]/).filter(Boolean).pop();
   return last ?? uri;
 }
 
 const importSummary = (r: ImportResult) =>
-  `${r.playlists} playlist(s) importée(s), ${r.tracksLinked} titre(s) retrouvé(s), ${r.audioImported} fichier(s) audio copié(s).` +
-  (r.missing.length ? `\n\nAbsents de ta bibliothèque (${r.missing.length}) :\n` + r.missing.slice(0, 8).map((m) => `• ${m.artist} – ${m.title}`).join('\n') : '');
+  tr().settings.importSummary(r) +
+  (r.missing.length ? tr().settings.missing(r.missing.length) + r.missing.slice(0, 8).map((m) => `• ${m.artist} – ${m.title}`).join('\n') : '');
 
 export default function Settings() {
   const insets = useSafeAreaInsets();
+  const t = useT();
+  const lang = useLang();
   const libraryChanged = usePlayerStore((s) => s.libraryChanged);
   const [dir, setDir] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -56,21 +60,21 @@ export default function Settings() {
       await action();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (!/cancel/i.test(msg)) Alert.alert('Oups', msg);
+      if (!/cancel/i.test(msg)) Alert.alert(t.common.oops, msg);
     } finally {
       setBusy(null);
     }
   };
 
   const scan = (uri: string) =>
-    run('Analyse du dossier…', async () => {
-      const r = await scanLibrary(uri, (p) => setBusy(`Analyse : ${p.done} / ${p.total}`));
+    run(t.settings.scanning, async () => {
+      const r = await scanLibrary(uri, (p) => setBusy(t.settings.scanProgress(p.done, p.total)));
       libraryChanged();
-      Alert.alert('Bibliothèque à jour', `${r.added} ajouté(s), ${r.removed} retiré(s), ${r.covers} pochette(s), ${r.lyrics} parole(s) trouvée(s)${r.failed ? `, ${r.failed} illisible(s)` : ''}.`);
+      Alert.alert(t.settings.libraryUpdated, t.settings.scanResult(r));
     });
 
   const choose = () =>
-    run('Choix du dossier…', async () => {
+    run(t.settings.choosing, async () => {
       const uri = await pickMusicDir();
       if (!uri) return;
       setDir(uri);
@@ -85,37 +89,34 @@ export default function Settings() {
   };
 
   const doExport = () =>
-    run('Préparation…', async () => {
+    run(t.settings.preparing, async () => {
       const plan = await prepareExport([...selected], withAudio);
       const details =
-        `${plan.manifest.playlists.length} playlist(s).\n` +
-        (withAudio
-          ? `${plan.audioToCopy.length} fichier(s) audio joint(s) (créations perso / licences libres).\n` +
-            `${plan.metadataOnly.length} titre(s) partagé(s) sans audio (achats / CD perso, non redistribuables).`
-          : 'Uniquement les infos des titres, aucun fichier audio.');
+        t.settings.exportPlaylists(plan.manifest.playlists.length) +
+        (withAudio ? t.settings.exportAudio(plan.audioToCopy.length, plan.metadataOnly.length) : t.settings.exportInfoOnly);
       const ok = await new Promise<boolean>((resolve) =>
-        Alert.alert('Exporter ?', `${details}\n\nChoisis ensuite où créer le dossier d'export.`, [
-          { text: 'Annuler', style: 'cancel', onPress: () => resolve(false) },
-          { text: 'Choisir le dossier', onPress: () => resolve(true) },
+        Alert.alert(t.settings.exportConfirm, t.settings.exportThen(details), [
+          { text: t.common.cancel, style: 'cancel', onPress: () => resolve(false) },
+          { text: t.settings.pickFolder, onPress: () => resolve(true) },
         ]),
       );
       if (!ok) return;
-      const name = await exportToFolder(plan, (d, t) => setBusy(`Copie : ${d} / ${t}`));
-      Alert.alert('Export terminé', `Dossier « ${name} » créé. Transmets-le (câble, clé USB, cloud…) puis importe-le dans SCMusic sur l'autre téléphone.`);
+      const name = await exportToFolder(plan, (d, total) => setBusy(t.settings.copying(d, total)));
+      Alert.alert(t.settings.exportDone, t.settings.exportDoneText(name));
     });
 
   const doImport = (fromFolder: boolean) =>
-    run('Import…', async () => {
+    run(t.settings.importing, async () => {
       const r = fromFolder ? await importFromFolder() : await importFromJsonFile();
       if (!r) return;
       libraryChanged();
-      Alert.alert('Import terminé', importSummary(r));
+      Alert.alert(t.settings.importDone, importSummary(r));
     });
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
       <Background />
-      <DetailHeader title="Réglages" />
+      <DetailHeader title={t.settings.title} />
       <ScrollView contentContainerStyle={{ padding: layout.gutter, paddingBottom: insets.bottom + space.xxl }}>
         {busy && (
           <GlassCard strong style={styles.busy}>
@@ -123,21 +124,34 @@ export default function Settings() {
           </GlassCard>
         )}
 
-        <SectionTitle>Dossier musique</SectionTitle>
+        <SectionTitle>{t.settings.language}</SectionTitle>
+        <GlassCard style={styles.card}>
+          {LANGS.map((l) => {
+            const on = l.value === lang;
+            return (
+              <Pressable key={l.value} onPress={() => saveLanguage(l.value)} style={styles.check} accessibilityRole="radio" accessibilityState={{ checked: on }}>
+                <View style={[styles.box, styles.radio, on && { backgroundColor: colors.accent, borderColor: colors.accent }]} />
+                <Txt style={{ flex: 1 }}>{l.label}</Txt>
+              </Pressable>
+            );
+          })}
+        </GlassCard>
+
+        <SectionTitle>{t.settings.musicFolder}</SectionTitle>
         <GlassCard style={styles.card}>
           <View style={styles.dirRow}>
             <Icon name="folder" color={colors.accent} />
-            <Txt numberOfLines={1} style={{ flex: 1 }}>{readableDir(dir)}</Txt>
+            <Txt numberOfLines={1} style={{ flex: 1 }}>{readableDir(dir) ?? t.settings.noFolder}</Txt>
           </View>
-          <Button title={dir ? 'Changer de dossier' : 'Choisir mon dossier'} icon="folder" onPress={choose} disabled={!!busy} />
-          {dir && <Button title="Rescanner" kind="ghost" onPress={() => scan(dir)} disabled={!!busy} />}
-          <Txt variant="muted">Formats lus : MP3 et FLAC. Image d’un titre : mets « nom.png » (ou .jpg) à côté de « nom.mp3 », puis rescanne. Sinon : image intégrée au fichier, puis cover.jpg du dossier.</Txt>
+          <Button title={dir ? t.settings.changeFolder : t.settings.chooseFolder} icon="folder" onPress={choose} disabled={!!busy} />
+          {dir && <Button title={t.settings.rescan} kind="ghost" onPress={() => scan(dir)} disabled={!!busy} />}
+          <Txt variant="muted">{t.settings.formats}</Txt>
         </GlassCard>
 
-        <SectionTitle>Partager avec un autre utilisateur</SectionTitle>
+        <SectionTitle>{t.settings.share}</SectionTitle>
         <GlassCard style={styles.card}>
-          <Txt variant="muted">Playlists à exporter :</Txt>
-          {lists.length === 0 && <Txt variant="muted">Aucune playlist pour l’instant.</Txt>}
+          <Txt variant="muted">{t.settings.toExport}</Txt>
+          {lists.length === 0 && <Txt variant="muted">{t.settings.noPlaylist}</Txt>}
           {lists.map((p) => {
             const on = selected.has(p.id);
             return (
@@ -150,28 +164,28 @@ export default function Settings() {
           })}
           <View style={styles.switchRow}>
             <View style={{ flex: 1 }}>
-              <Txt>Joindre les fichiers audio</Txt>
-              <Txt variant="muted">Seulement « Ma création » et « Licence libre ». Les achats et CD restent privés : seules leurs infos partent.</Txt>
+              <Txt>{t.settings.withAudio}</Txt>
+              <Txt variant="muted">{t.settings.withAudioNote}</Txt>
             </View>
             <Switch value={withAudio} onValueChange={setWithAudio} trackColor={{ true: colors.accent, false: colors.glassStrong }} thumbColor={colors.text} />
           </View>
-          <Button title="Exporter dans un dossier" icon="folder" onPress={doExport} disabled={!!busy || selected.size === 0} />
-          <Button title="Envoyer les playlists (JSON)" kind="ghost" icon="playlist" onPress={() => run('Partage…', () => sharePlaylistsJson([...selected]))} disabled={!!busy || selected.size === 0} />
+          <Button title={t.settings.exportFolder} icon="folder" onPress={doExport} disabled={!!busy || selected.size === 0} />
+          <Button title={t.settings.sendJson} kind="ghost" icon="playlist" onPress={() => run(t.settings.sharing, () => sharePlaylistsJson([...selected]))} disabled={!!busy || selected.size === 0} />
         </GlassCard>
 
-        <SectionTitle>Recevoir un partage</SectionTitle>
+        <SectionTitle>{t.settings.receive}</SectionTitle>
         <GlassCard style={styles.card}>
-          <Button title="Importer un dossier d’export" icon="folder" onPress={() => doImport(true)} disabled={!!busy} />
-          <Button title="Importer un fichier JSON" kind="ghost" icon="playlist" onPress={() => doImport(false)} disabled={!!busy} />
-          <Txt variant="muted">Les titres d’une playlist reçue sont retrouvés dans ta bibliothèque par titre et artiste.</Txt>
+          <Button title={t.settings.importFolder} icon="folder" onPress={() => doImport(true)} disabled={!!busy} />
+          <Button title={t.settings.importJson} kind="ghost" icon="playlist" onPress={() => doImport(false)} disabled={!!busy} />
+          <Txt variant="muted">{t.settings.importNote}</Txt>
         </GlassCard>
 
-        <SectionTitle>Réseau</SectionTitle>
+        <SectionTitle>{t.settings.network}</SectionTitle>
         <GlassCard style={styles.card}>
           <View style={styles.switchRow}>
             <View style={{ flex: 1 }}>
-              <Txt>Mode hors ligne</Txt>
-              <Txt variant="muted">Bloque toute connexion de SCMusic : recherche de paroles et d’albums, mises à jour. La lecture, les paroles déjà enregistrées et les stats marchent normalement.</Txt>
+              <Txt>{t.settings.offline}</Txt>
+              <Txt variant="muted">{t.settings.offlineNote}</Txt>
             </View>
             <Switch
               value={offline}
@@ -182,14 +196,14 @@ export default function Settings() {
           </View>
         </GlassCard>
 
-        <SectionTitle>Mises à jour</SectionTitle>
+        <SectionTitle>{t.settings.updates}</SectionTitle>
         <GlassCard style={styles.card}>
-          <Txt>Version installée : {currentVersion()}</Txt>
-          <Button title="Vérifier les mises à jour" icon="down" onPress={() => run('Vérification…', () => updater.check(true))} disabled={!!busy || updater.progress != null || offline} />
+          <Txt>{t.settings.installed(currentVersion())}</Txt>
+          <Button title={t.settings.checkUpdates} icon="down" onPress={() => run(t.settings.checking, () => updater.check(true))} disabled={!!busy || updater.progress != null || offline} />
           <View style={styles.switchRow}>
             <View style={{ flex: 1 }}>
-              <Txt>Vérifier à l’ouverture</Txt>
-              <Txt variant="muted">Au plus une fois par semaine, une requête à GitHub (dépôt public SCMusic-releases). Aucune donnée personnelle envoyée. Jamais en mode hors ligne.</Txt>
+              <Txt>{t.settings.checkOnOpen}</Txt>
+              <Txt variant="muted">{t.settings.checkOnOpenNote}</Txt>
             </View>
             <Switch
               value={autoUpdate}
@@ -200,8 +214,8 @@ export default function Settings() {
           </View>
           <View style={styles.switchRow}>
             <View style={{ flex: 1 }}>
-              <Txt>Seulement en Wi-Fi</Txt>
-              <Txt variant="muted">La vérification automatique attend le Wi-Fi (rien en données mobiles).</Txt>
+              <Txt>{t.settings.wifiOnly}</Txt>
+              <Txt variant="muted">{t.settings.wifiOnlyNote}</Txt>
             </View>
             <Switch
               value={wifiOnly}
@@ -213,8 +227,8 @@ export default function Settings() {
           </View>
         </GlassCard>
 
-        <SectionTitle>À propos</SectionTitle>
-        <Txt variant="muted">SCMusic, logiciel libre sous licence GPL-3.0. Tes fichiers et ta bibliothèque ne quittent jamais ton téléphone. Seules connexions : la recherche de paroles ou d’albums quand tu la demandes, et la vérification des mises à jour.</Txt>
+        <SectionTitle>{t.settings.about}</SectionTitle>
+        <Txt variant="muted">{t.settings.aboutText}</Txt>
       </ScrollView>
       <UpdateProgress progress={updater.progress} />
     </View>
@@ -227,5 +241,6 @@ const styles = StyleSheet.create({
   dirRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   check: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.xs },
   box: { width: 20, height: 20, borderRadius: radius.sm / 2, borderWidth: 2, borderColor: colors.textMuted },
+  radio: { borderRadius: radius.pill },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
 });

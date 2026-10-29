@@ -4,16 +4,16 @@
 import { File, type Directory } from 'expo-file-system';
 import { getNetworkStateAsync, NetworkStateType } from 'expo-network';
 import { getSetting, setSetting } from '@/db/queries';
+import { tr } from '@/i18n';
 
 export const TIMEOUT_MS = 15000;
 const OFFLINE_KEY = 'offlineMode';
 
-export const OFFLINE_MESSAGE = 'Mode hors ligne activé : désactive-le dans Réglages → Réseau pour utiliser Internet.';
 
 /** Erreur levée quand le mode hors ligne bloque une requête (à distinguer d'une vraie panne réseau). */
 export class OfflineError extends Error {
   constructor() {
-    super(OFFLINE_MESSAGE);
+    super(tr().errors.offline);
     this.name = 'OfflineError';
   }
 }
@@ -73,9 +73,9 @@ export const MAX_RESPONSE_CHARS = 2 * 1024 * 1024;
  */
 export async function readText(res: Response, maxChars = MAX_RESPONSE_CHARS): Promise<string> {
   const declared = Number(res.headers?.get('content-length'));
-  if (declared > maxChars) throw new Error('Réponse du serveur trop volumineuse, ignorée.');
+  if (declared > maxChars) throw new Error(tr().errors.tooBig);
   const text = await res.text();
-  if (text.length > maxChars) throw new Error('Réponse du serveur trop volumineuse, ignorée.');
+  if (text.length > maxChars) throw new Error(tr().errors.tooBig);
   return text;
 }
 
@@ -83,7 +83,7 @@ export async function readJson<T>(res: Response, maxChars = MAX_RESPONSE_CHARS):
   try {
     return JSON.parse(await readText(res, maxChars)) as T;
   } catch (e) {
-    if (e instanceof SyntaxError) throw new Error('Réponse du serveur illisible.');
+    if (e instanceof SyntaxError) throw new Error(tr().errors.unreadable);
     throw e;
   }
 }

@@ -14,12 +14,14 @@ import { cleanLyrics, lyricsToPlainText, MAX_LYRICS_CHARS, toLrc } from '@/libra
 import { getPlayer } from '@/player/engine';
 import { useCurrentTrack, usePlayerStore } from '@/store/usePlayerStore';
 import { colors, font, fontFamily, layout, radius, space } from '@/theme/tokens';
+import { useT } from '@/i18n';
 
 /** "Annuler" revient un peu avant la ligne annulée pour pouvoir la retoucher. */
 const UNDO_REWIND = 2;
 
 export default function LyricsEdit() {
   const insets = useSafeAreaInsets();
+  const t = useT();
   const track = useCurrentTrack();
   const status = useAudioPlayerStatus(getPlayer());
   const { seek, libraryChanged } = usePlayerStore();
@@ -32,15 +34,15 @@ export default function LyricsEdit() {
   // Préremplit avec les paroles déjà connues (sans leurs horodatages)
   useEffect(() => {
     if (trackId == null) return;
-    trackLyrics(trackId).then((t) => t && setText(lyricsToPlainText(t))).catch(() => {});
+    trackLyrics(trackId).then((saved) => saved && setText(lyricsToPlainText(saved))).catch(() => {});
   }, [trackId]);
 
   if (!track) {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
         <Background />
-        <DetailHeader title="Paroles" icon="down" />
-        <EmptyState icon="lyrics" title="Rien en lecture" text="Lance un morceau pour écrire ou synchroniser ses paroles." />
+        <DetailHeader title={t.lyrics.title} icon="down" />
+        <EmptyState icon="lyrics" title={t.common.nothingPlaying} text={t.lyrics.noTrackText} />
       </View>
     );
   }
@@ -59,23 +61,23 @@ export default function LyricsEdit() {
       const result = await searchLyricsOnline(track, force);
       const found = result.kind === 'found' ? result.lyrics : null;
       if (result.kind === 'already') {
-        Alert.alert('Déjà cherché', `LRCLIB n'avait rien pour « ${track.title} » le ${formatDay(result.at)}. Pour ne pas redemander, rien n'a été envoyé.`, [
-          { text: 'Annuler', style: 'cancel' },
-          { text: 'Chercher quand même', onPress: () => searchOnline(true) },
+        Alert.alert(t.lyrics.already, t.lyrics.alreadyText(track.title, formatDay(result.at)), [
+          { text: t.common.cancel, style: 'cancel' },
+          { text: t.lyrics.searchAnyway, onPress: () => searchOnline(true) },
         ]);
       } else if (!found) {
-        Alert.alert('Rien trouvé', `Pas de paroles sur LRCLIB pour « ${track.title} ». Colle-les depuis un site, puis synchronise-les.`);
+        Alert.alert(t.lyrics.notFound, t.lyrics.notFoundSync(track.title));
       } else if (found.synced) {
-        Alert.alert('Paroles synchronisées trouvées', `Source : ${found.source}`, [
-          { text: 'Voir le texte', style: 'cancel', onPress: () => setText(lyricsToPlainText(found.text)) },
-          { text: 'Enregistrer', onPress: () => save(found.text) },
+        Alert.alert(t.lyrics.foundSynced, t.lyrics.source(found.source), [
+          { text: t.lyrics.viewText, style: 'cancel', onPress: () => setText(lyricsToPlainText(found.text)) },
+          { text: t.common.save, onPress: () => save(found.text) },
         ]);
       } else {
         setText(found.text);
-        Alert.alert('Texte trouvé', `Source : ${found.source}\nCes paroles ne sont pas synchronisées : touche « Synchroniser » pour le faire au doigt.`);
+        Alert.alert(t.lyrics.foundText, t.lyrics.sourceNotSynced(found.source));
       }
     } catch (e) {
-      Alert.alert('Recherche impossible', e instanceof Error ? e.message : String(e));
+      Alert.alert(t.lyrics.searchFailed, e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
@@ -113,8 +115,8 @@ export default function LyricsEdit() {
       <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom + space.lg }]}>
         <Background />
         <DetailHeader
-          title="Synchronisation"
-          subtitle={`${Math.min(next, lines.length)} / ${lines.length} lignes · ${formatTime(status.currentTime)}`}
+          title={t.lyrics.syncTitle}
+          subtitle={t.lyrics.syncProgress(Math.min(next, lines.length), lines.length, formatTime(status.currentTime))}
           icon="back"
           onBack={() => {
             getPlayer().pause();
@@ -125,8 +127,8 @@ export default function LyricsEdit() {
           <GlassCard style={styles.preview}>
             <View style={styles.previewInner}>
               {lines[next - 1] ? <Txt style={styles.prevLine} numberOfLines={2}>{lines[next - 1]}</Txt> : null}
-              <Txt variant="caption">{done ? 'Terminé' : 'Touche quand cette ligne commence'}</Txt>
-              <Txt style={styles.nextLine} numberOfLines={3}>{done ? 'Toutes les lignes sont placées.' : lines[next]}</Txt>
+              <Txt variant="caption">{done ? t.lyrics.finished : t.lyrics.tapWhen}</Txt>
+              <Txt style={styles.nextLine} numberOfLines={3}>{done ? t.lyrics.allPlaced : lines[next]}</Txt>
               {lines[next + 1] ? <Txt style={styles.prevLine} numberOfLines={2}>{lines[next + 1]}</Txt> : null}
             </View>
           </GlassCard>
@@ -134,21 +136,21 @@ export default function LyricsEdit() {
           <Pressable
             onPress={done ? finish : tap}
             accessibilityRole="button"
-            accessibilityLabel={done ? 'Enregistrer' : 'Ligne suivante'}
+            accessibilityLabel={done ? t.common.save : t.lyrics.nextLine}
             style={({ pressed }) => [styles.tap, { opacity: pressed ? 0.75 : 1 }]}
           >
-            <Txt style={styles.tapText}>{done ? 'Enregistrer' : 'Ligne suivante'}</Txt>
+            <Txt style={styles.tapText}>{done ? t.common.save : t.lyrics.nextLine}</Txt>
           </Pressable>
 
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
-              <Button title="Annuler la ligne" kind="ghost" icon="back" onPress={undo} disabled={!times.length} />
+              <Button title={t.lyrics.undoLine} kind="ghost" icon="back" onPress={undo} disabled={!times.length} />
             </View>
             <View style={{ flex: 1 }}>
-              <Button title={status.playing ? 'Pause' : 'Lecture'} kind="ghost" icon={status.playing ? 'pause' : 'play'} onPress={() => (status.playing ? getPlayer().pause() : getPlayer().play())} />
+              <Button title={status.playing ? t.common.pause : t.common.play} kind="ghost" icon={status.playing ? 'pause' : 'play'} onPress={() => (status.playing ? getPlayer().pause() : getPlayer().play())} />
             </View>
           </View>
-          <Button title="Recommencer" kind="ghost" onPress={startSync} />
+          <Button title={t.lyrics.restart} kind="ghost" onPress={startSync} />
         </View>
       </View>
     );
@@ -158,31 +160,31 @@ export default function LyricsEdit() {
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom + space.lg }]}>
         <Background />
-        <DetailHeader title="Paroles" subtitle={`${track.artist} – ${track.title}`} icon="down" />
+        <DetailHeader title={t.lyrics.title} subtitle={`${track.artist} – ${track.title}`} icon="down" />
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-          <Button title={busy ? 'Recherche…' : 'Chercher en ligne (LRCLIB)'} icon="search" onPress={() => searchOnline()} disabled={busy} />
-          <Txt variant="muted">Envoie seulement le titre et l’artiste à lrclib.net. Sinon, colle le texte copié depuis un site :</Txt>
+          <Button title={busy ? t.common.searching : t.lyrics.searchLrclib} icon="search" onPress={() => searchOnline()} disabled={busy} />
+          <Txt variant="muted">{t.lyrics.privacy}</Txt>
           <TextInput
             value={text}
             onChangeText={setText}
             maxLength={MAX_LYRICS_CHARS}
             multiline
-            placeholder={'Une ligne de paroles par ligne…'}
+            placeholder={t.lyrics.placeholder}
             placeholderTextColor={colors.textFaint}
             style={styles.input}
             textAlignVertical="top"
             autoCorrect={false}
           />
-          <Button title="Synchroniser au doigt" icon="lyrics" onPress={startSync} disabled={!lines.length} />
-          <Button title="Enregistrer sans synchro" kind="ghost" onPress={() => save(cleanLyrics(text))} disabled={!lines.length} />
+          <Button title={t.lyrics.syncByHand} icon="lyrics" onPress={startSync} disabled={!lines.length} />
+          <Button title={t.lyrics.saveUnsynced} kind="ghost" onPress={() => save(cleanLyrics(text))} disabled={!lines.length} />
           <Button
-            title="Retirer les paroles"
+            title={t.lyrics.removeAll}
             kind="danger"
             icon="trash"
             onPress={() =>
-              Alert.alert('Retirer les paroles ?', track.title, [
-                { text: 'Annuler', style: 'cancel' },
-                { text: 'Retirer', style: 'destructive', onPress: () => save(null) },
+              Alert.alert(t.lyrics.removeConfirm, track.title, [
+                { text: t.common.cancel, style: 'cancel' },
+                { text: t.common.remove, style: 'destructive', onPress: () => save(null) },
               ])
             }
           />

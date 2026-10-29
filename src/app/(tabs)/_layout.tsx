@@ -5,15 +5,18 @@ import { Icon, type IconName } from '@/components/Icon';
 import { MiniPlayer } from '@/components/MiniPlayer';
 import { GlassCard, Txt } from '@/components/ui';
 import { colors, layout, space } from '@/theme/tokens';
+import { useT } from '@/i18n';
+import type { Messages } from '@/i18n/fr';
 
-const TABS: Record<string, { label: string; icon: IconName }> = {
-  index: { label: 'Accueil', icon: 'home' },
-  search: { label: 'Recherche', icon: 'search' },
-  library: { label: 'Biblio', icon: 'library' },
-  playlists: { label: 'Playlists', icon: 'playlist' },
+const TABS: Record<string, { label: keyof Messages['tabs']; icon: IconName }> = {
+  index: { label: 'home', icon: 'home' },
+  search: { label: 'search', icon: 'search' },
+  library: { label: 'library', icon: 'library' },
+  playlists: { label: 'playlists', icon: 'playlist' },
 };
 
 function TabBar({ state, navigateToTab, insets }: BottomTabBarProps) {
+  const t = useT();
   return (
     <View style={[styles.wrap, { paddingBottom: insets.bottom }]}>
       <MiniPlayer />
@@ -33,7 +36,7 @@ function TabBar({ state, navigateToTab, insets }: BottomTabBarProps) {
                 accessibilityState={{ selected: focused }}
               >
                 <Icon name={tab.icon} size={22} color={color} />
-                <Txt style={{ color, fontSize: 10 }}>{tab.label}</Txt>
+                <Txt style={{ color, fontSize: 10 }}>{t.tabs[tab.label]}</Txt>
               </Pressable>
             );
           })}

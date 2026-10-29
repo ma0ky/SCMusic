@@ -12,8 +12,10 @@ import type { Track } from '@/db/types';
 import { useLibrary } from '@/store/useLibrary';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { radius, space } from '@/theme/tokens';
+import { useT } from '@/i18n';
 
 export default function Album() {
+  const t = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const playTracks = usePlayerStore((s) => s.playTracks);
   const { data: tracks } = useLibrary(() => albumTracks(id), [] as Track[], [id]);
@@ -28,13 +30,13 @@ export default function Album() {
     <Screen>
       <DetailHeader
         title={id}
-        subtitle={tracks[0] ? `${tracks[0].artist} · ${tracks.length} titres` : undefined}
+        subtitle={tracks[0] ? t.album.subtitle(tracks[0].artist, tracks.length) : undefined}
         right={
           tracks.length > 0 && (
             <IconButton
               name="edit"
-              label="Renommer l'album"
-              onPress={() => router.push({ pathname: '/track-edit', params: { ids: tracks.map((t) => t.id).join(','), album: id } })}
+              label={t.album.rename}
+              onPress={() => router.push({ pathname: '/track-edit', params: { ids: tracks.map((track) => track.id).join(','), album: id } })}
             />
           )
         }
@@ -43,15 +45,15 @@ export default function Album() {
         tracks={tracks}
         header={
           <View style={{ padding: space.md, gap: space.lg, alignItems: 'center' }}>
-            <Cover uri={tracks.find((t) => t.coverUri)?.coverUri} size={220} rounded={radius.lg} />
+            <Cover uri={tracks.find((track) => track.coverUri)?.coverUri} size={220} rounded={radius.lg} />
             <View style={{ alignSelf: 'stretch', gap: space.sm }}>
-              <Button title="Lire l'album" icon="play" onPress={() => playTracks(tracks)} disabled={tracks.length === 0} />
+              <Button title={t.album.play} icon="play" onPress={() => playTracks(tracks)} disabled={tracks.length === 0} />
               {id === 'Album inconnu' && tracks.length > 0 && (
                 <Button
-                  title="Trouver leurs albums en ligne"
+                  title={t.common.findAlbumsOnline}
                   kind="ghost"
                   icon="search"
-                  onPress={() => router.push({ pathname: '/album-lookup', params: { ids: tracks.map((t) => t.id).join(',') } })}
+                  onPress={() => router.push({ pathname: '/album-lookup', params: { ids: tracks.map((track) => track.id).join(',') } })}
                 />
               )}
             </View>

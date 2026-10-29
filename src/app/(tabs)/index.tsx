@@ -14,6 +14,7 @@ import type { Track } from '@/db/types';
 import { useLibrary } from '@/store/useLibrary';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { colors, layout, space } from '@/theme/tokens';
+import { useT } from '@/i18n';
 
 function Logo() {
   return (
@@ -24,6 +25,7 @@ function Logo() {
 }
 
 export default function Home() {
+  const t = useT();
   const playTracks = usePlayerStore((s) => s.playTracks);
   const [menuFor, setMenuFor] = useState<Track | null>(null);
   const { data, loading } = useLibrary(
@@ -35,8 +37,8 @@ export default function Home() {
     list.length > 0 && (
       <>
         <SectionTitle>{title}</SectionTitle>
-        {list.map((t, i) => (
-          <TrackRow key={t.id} track={t} onPress={() => playTracks(list, i)} onMore={() => setMenuFor(t)} />
+        {list.map((track, i) => (
+          <TrackRow key={track.id} track={track} onPress={() => playTracks(list, i)} onMore={() => setMenuFor(track)} />
         ))}
       </>
     );
@@ -47,16 +49,16 @@ export default function Home() {
         title="SCMusic"
         right={
           <>
-            <IconButton name="stats" label="Statistiques d'écoute" onPress={() => router.push('/stats')} />
-            <IconButton name="settings" label="Réglages" onPress={() => router.push('/settings')} />
+            <IconButton name="stats" label={t.home.stats} onPress={() => router.push('/stats')} />
+            <IconButton name="settings" label={t.home.settings} onPress={() => router.push('/settings')} />
           </>
         }
       />
       <ScrollView contentContainerStyle={{ paddingHorizontal: layout.gutter, paddingBottom: layout.contentBottom }}>
         {!loading && data.added.length === 0 ? (
           <GlassCard style={{ marginTop: space.xl }}>
-            <EmptyState icon="folder" title="Bienvenue sur SCMusic" text="Choisis le dossier qui contient tes MP3 et FLAC pour construire ta bibliothèque.">
-              <Button title="Choisir mon dossier musique" icon="folder" onPress={() => router.push('/settings')} />
+            <EmptyState icon="folder" title={t.home.welcome} text={t.home.welcomeText}>
+              <Button title={t.home.chooseFolder} icon="folder" onPress={() => router.push('/settings')} />
             </EmptyState>
           </GlassCard>
         ) : (
@@ -67,14 +69,14 @@ export default function Home() {
                   <Icon name="heartFill" size={26} color={colors.liked} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Txt variant="heading">Titres aimés</Txt>
-                  <Txt variant="muted">{data.liked.length} morceau{data.liked.length > 1 ? 'x' : ''}</Txt>
+                  <Txt variant="heading">{t.home.liked}</Txt>
+                  <Txt variant="muted">{t.home.likedCount(data.liked.length)}</Txt>
                 </View>
                 <Logo />
               </GlassCard>
             </Pressable>
-            {section('Écoutés récemment', data.recent)}
-            {section('Ajoutés récemment', data.added)}
+            {section(t.home.recent, data.recent)}
+            {section(t.home.added, data.added)}
           </>
         )}
       </ScrollView>

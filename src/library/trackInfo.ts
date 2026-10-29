@@ -2,6 +2,7 @@
 // Ces textes ne servent qu'à l'affichage et aux requêtes paramétrées : jamais à construire un chemin
 // de fichier, une URL ou du code. On les nettoie quand même pour qu'ils restent affichables et sûrs.
 import type { TrackInfoPatch } from '@/db/queries';
+import { tr } from '@/i18n';
 
 export const MAX_FIELD_LENGTH = 200;
 const MAX_TRACK_NO = 999;
@@ -37,17 +38,17 @@ export function formToPatch(form: TrackInfoForm, multiple: boolean): FormResult 
   let trackNo: number | null | undefined;
   if (no === '') trackNo = multiple ? undefined : null;
   else if (/^\d{1,3}$/.test(no) && Number(no) >= 1 && Number(no) <= MAX_TRACK_NO) trackNo = Number(no);
-  else return { ok: false, error: `Le numéro de piste doit être un nombre entre 1 et ${MAX_TRACK_NO}.` };
+  else return { ok: false, error: tr().trackEdit.badTrackNo(MAX_TRACK_NO) };
 
   if (multiple) {
     const patch: TrackInfoPatch = {};
     if (artist) patch.artist = artist;
     if (album) patch.album = album;
     if (trackNo !== undefined) patch.trackNo = trackNo;
-    if (!Object.keys(patch).length) return { ok: false, error: 'Remplis au moins un champ à appliquer aux titres choisis.' };
+    if (!Object.keys(patch).length) return { ok: false, error: tr().trackEdit.fillOne };
     return { ok: true, patch };
   }
-  if (!title) return { ok: false, error: 'Le titre ne peut pas être vide.' };
+  if (!title) return { ok: false, error: tr().trackEdit.emptyTitle };
   return { ok: true, patch: { title, artist: artist || 'Artiste inconnu', album: album || 'Album inconnu', trackNo } };
 }
 

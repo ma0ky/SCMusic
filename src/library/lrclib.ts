@@ -6,6 +6,7 @@ import { lyricsNotFoundAt, saveLyricsNotFound } from '@/db/queries';
 import type { Track } from '@/db/types';
 import { cleanLyrics } from './lyrics';
 import { netFetch, OfflineError, readJson } from '@/net/network';
+import { tr } from '@/i18n';
 
 const SEARCH_URL = 'https://lrclib.net/api/search';
 /** Écart de durée toléré entre le fichier et le résultat (versions radio, live…). */
@@ -47,7 +48,7 @@ export function pickBestMatch(results: LrclibResult[], duration: number | null):
 /** 1730000000000 → "27/10/2026" (date d'une recherche passée). */
 export function formatDay(ms: number): string {
   const d = new Date(ms);
-  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+  return tr().dates.shortDate(d.getDate(), d.getMonth() + 1, d.getFullYear());
 }
 
 export type LyricsSearch =
@@ -78,10 +79,10 @@ export async function searchLyricsOnline(
     });
   } catch (e) {
     if (e instanceof OfflineError) throw e;
-    throw new Error('Pas de connexion à Internet, ou LRCLIB ne répond pas.');
+    throw new Error(tr().errors.noConnection('LRCLIB'));
   }
-  if (res.status === 503 || res.status === 429) throw new Error('LRCLIB est surchargé, réessaie dans un moment.');
-  if (!res.ok) throw new Error(`LRCLIB a répondu une erreur (${res.status}).`);
+  if (res.status === 503 || res.status === 429) throw new Error(tr().errors.busy('LRCLIB'));
+  if (!res.ok) throw new Error(tr().errors.httpError('LRCLIB', res.status));
 
   const best = pickBestMatch(await readJson<LrclibResult[]>(res), track.duration);
   if (!best) {

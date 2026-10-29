@@ -12,20 +12,22 @@ import type { Playlist } from '@/db/types';
 import { useLibrary } from '@/store/useLibrary';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { colors, layout, radius, space } from '@/theme/tokens';
+import { useT } from '@/i18n';
 
 export default function Playlists() {
+  const t = useT();
   const [creating, setCreating] = useState(false);
   const libraryChanged = usePlayerStore((s) => s.libraryChanged);
   const { data } = useLibrary(playlists, [] as Playlist[]);
 
   return (
     <Screen>
-      <PageTitle title="Playlists" right={<IconButton name="plus" label="Nouvelle playlist" onPress={() => setCreating(true)} />} />
+      <PageTitle title={t.tabs.playlists} right={<IconButton name="plus" label={t.common.newPlaylist} onPress={() => setCreating(true)} />} />
       <FlatList
         data={data}
         keyExtractor={(p) => String(p.id)}
         contentContainerStyle={{ paddingHorizontal: space.sm, paddingBottom: layout.contentBottom }}
-        ListEmptyComponent={<EmptyState icon="playlist" title="Aucune playlist" text="Crée ta première playlist avec le bouton +." />}
+        ListEmptyComponent={<EmptyState icon="playlist" title={t.playlists.none} text={t.playlists.noneText} />}
         renderItem={({ item }) => (
           <Pressable
             onPress={() => router.push({ pathname: '/playlist/[id]', params: { id: String(item.id) } })}
@@ -36,15 +38,15 @@ export default function Playlists() {
             </View>
             <View style={{ flex: 1 }}>
               <Txt numberOfLines={1}>{item.name}</Txt>
-              <Txt variant="muted">{item.trackCount} titre{item.trackCount > 1 ? 's' : ''}</Txt>
+              <Txt variant="muted">{t.common.tracks(item.trackCount)}</Txt>
             </View>
           </Pressable>
         )}
       />
       <PromptSheet
         visible={creating}
-        title="Nouvelle playlist"
-        confirmLabel="Créer"
+        title={t.common.newPlaylist}
+        confirmLabel={t.common.create}
         onClose={() => setCreating(false)}
         onSubmit={async (name) => {
           const id = await createPlaylist(name);

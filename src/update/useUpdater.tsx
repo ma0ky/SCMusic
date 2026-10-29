@@ -5,10 +5,10 @@ import { Alert, StyleSheet, View } from 'react-native';
 import { GlassCard, Txt } from '@/components/ui';
 import { colors, layout, radius, space } from '@/theme/tokens';
 import { checkForUpdate, currentVersion, downloadAndInstall, skipVersion, type UpdateInfo } from './updater';
-
-const megabytes = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} Mo`;
+import { useT } from '@/i18n';
 
 export function useUpdater() {
+  const t = useT();
   const [progress, setProgress] = useState<number | null>(null);
 
   const install = async (info: UpdateInfo) => {
@@ -16,7 +16,7 @@ export function useUpdater() {
     try {
       await downloadAndInstall(info, setProgress);
     } catch (e) {
-      Alert.alert('Mise à jour impossible', e instanceof Error ? e.message : String(e));
+      Alert.alert(t.update.failed, e instanceof Error ? e.message : String(e));
     } finally {
       setProgress(null);
     }
@@ -24,12 +24,12 @@ export function useUpdater() {
 
   const offer = (info: UpdateInfo) =>
     Alert.alert(
-      `SCMusic ${info.version} disponible`,
-      `Tu as la version ${currentVersion()}.${info.notes ? `\n\n${info.notes}` : ''}\n\nTéléchargement : ${megabytes(info.size)}. Android te demandera de confirmer l'installation ; tes titres et playlists sont gardés.`,
+      t.update.available(info.version),
+      t.update.offer(currentVersion(), info.notes, t.update.megabytes((info.size / 1024 / 1024).toFixed(1))),
       [
-        { text: 'Ignorer cette version', style: 'destructive', onPress: () => skipVersion(info.version) },
-        { text: 'Plus tard', style: 'cancel' },
-        { text: 'Mettre à jour', onPress: () => install(info) },
+        { text: t.update.skip, style: 'destructive', onPress: () => skipVersion(info.version) },
+        { text: t.common.later, style: 'cancel' },
+        { text: t.update.install, onPress: () => install(info) },
       ],
     );
 
@@ -38,9 +38,9 @@ export function useUpdater() {
     try {
       const info = await checkForUpdate(manual);
       if (info) offer(info);
-      else if (manual) Alert.alert('À jour', `Tu as la dernière version (${currentVersion()}).`);
+      else if (manual) Alert.alert(t.update.upToDate, t.update.upToDateText(currentVersion()));
     } catch (e) {
-      if (manual) Alert.alert('Vérification impossible', e instanceof Error ? e.message : String(e));
+      if (manual) Alert.alert(t.update.checkFailed, e instanceof Error ? e.message : String(e));
     }
   };
 
@@ -49,12 +49,13 @@ export function useUpdater() {
 
 /** Bandeau de progression du téléchargement, posé au-dessus de l'écran. */
 export function UpdateProgress({ progress }: { progress: number | null }) {
+  const t = useT();
   if (progress == null) return null;
   const pct = Math.round(Math.min(Math.max(progress, 0), 1) * 100);
   return (
     <View style={styles.wrap} pointerEvents="none">
       <GlassCard strong style={styles.card}>
-        <Txt>Téléchargement de la mise à jour… {pct} %</Txt>
+        <Txt>{t.update.downloading(pct)}</Txt>
         <View style={styles.track}>
           <View style={[styles.fill, { width: `${pct}%` }]} />
         </View>

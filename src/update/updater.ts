@@ -12,6 +12,7 @@ import { startActivityAsync } from 'expo-intent-launcher';
 import { Platform } from 'react-native';
 import { getSetting, setSetting } from '@/db/queries';
 import { isOfflineMode, netDownload, netFetch, OfflineError, onWifi, readJson, readText } from '@/net/network';
+import { tr } from '@/i18n';
 
 const RELEASES_URL = 'https://api.github.com/repos/ma0ky/SCMusic-releases/releases/latest';
 /** Seules adresses de téléchargement acceptées (APK et empreinte). */
@@ -105,11 +106,11 @@ export async function checkForUpdate(force = false): Promise<UpdateInfo | null> 
     res = await netFetch(RELEASES_URL, { headers: HEADERS });
   } catch (e) {
     if (e instanceof OfflineError) throw e;
-    throw new Error('Pas de connexion à Internet, ou GitHub ne répond pas.');
+    throw new Error(tr().update.noConnection);
   }
   await setSetting(LAST_CHECK_KEY, String(Date.now()));
   if (res.status === 404) return null; // aucune version publiée
-  if (!res.ok) throw new Error(`GitHub a répondu une erreur (${res.status}).`);
+  if (!res.ok) throw new Error(tr().update.httpError(res.status));
 
   const info = parseRelease(await readJson<GithubRelease>(res));
   if (!info || compareVersions(info.version, currentVersion()) <= 0) return null;
@@ -154,13 +155,13 @@ export async function downloadAndInstall(info: UpdateInfo, onProgress?: (fractio
     });
   } catch (e) {
     if (e instanceof OfflineError) throw e;
-    throw new Error('Téléchargement interrompu. Vérifie ta connexion et réessaie.');
+    throw new Error(tr().update.interrupted);
   }
 
   // Rien n'est installé sans empreinte valide : en cas de doute, on refuse (jamais l'inverse)
   if (apk.size !== info.size) {
     apk.delete();
-    throw new Error('Le fichier téléchargé est incomplet. Réessaie plus tard.');
+    throw new Error(tr().update.incomplete);
   }
   // Fichier "empreinte  nom.apk" produit par scripts/sign-apk.sh
   let expected: string;
@@ -171,12 +172,12 @@ export async function downloadAndInstall(info: UpdateInfo, onProgress?: (fractio
   } catch (e) {
     apk.delete();
     if (e instanceof OfflineError) throw e;
-    throw new Error('Impossible de vérifier le fichier téléchargé. Réessaie plus tard.');
+    throw new Error(tr().update.cantVerify);
   }
   const actual = await apk.digest('SHA-256');
   if (!/^[0-9a-f]{64}$/.test(expected) || expected !== actual) {
     apk.delete();
-    throw new Error('Le fichier téléchargé est abîmé (empreinte différente). Réessaie plus tard.');
+    throw new Error(tr().update.corrupted);
   }
 
   await startActivityAsync('android.intent.action.VIEW', {

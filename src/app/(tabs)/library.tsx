@@ -13,23 +13,20 @@ import { albums, allTracks, artists, likedTracks } from '@/db/queries';
 import type { AlbumSummary, ArtistSummary, Track } from '@/db/types';
 import { useLibrary } from '@/store/useLibrary';
 import { colors, layout, radius, space } from '@/theme/tokens';
+import { useT } from '@/i18n';
 
 type Tab = 'tracks' | 'albums' | 'artists' | 'liked';
-const TABS: { key: Tab; label: string }[] = [
-  { key: 'tracks', label: 'Titres' },
-  { key: 'albums', label: 'Albums' },
-  { key: 'artists', label: 'Artistes' },
-  { key: 'liked', label: 'Aimés' },
-];
+const TABS: Tab[] = ['tracks', 'albums', 'artists', 'liked'];
 
-function Segments({ value, onChange }: { value: Tab; onChange: (t: Tab) => void }) {
+function Segments({ value, onChange }: { value: Tab; onChange: (tab: Tab) => void }) {
+  const t = useT();
   return (
     <View style={styles.segments}>
-      {TABS.map((t) => {
-        const on = t.key === value;
+      {TABS.map((tab) => {
+        const on = tab === value;
         return (
-          <Pressable key={t.key} onPress={() => onChange(t.key)} style={[styles.segment, on && styles.segmentOn]} accessibilityState={{ selected: on }}>
-            <Txt style={{ color: on ? colors.bg : colors.textMuted, fontWeight: '700', fontSize: 13 }}>{t.label}</Txt>
+          <Pressable key={tab} onPress={() => onChange(tab)} style={[styles.segment, on && styles.segmentOn]} accessibilityState={{ selected: on }}>
+            <Txt style={{ color: on ? colors.bg : colors.textMuted, fontWeight: '700', fontSize: 13 }}>{t.library[tab]}</Txt>
           </Pressable>
         );
       })}
@@ -55,9 +52,8 @@ function GroupRow({ icon, title, subtitle, onPress, coverUri }: { icon: 'disc' |
   );
 }
 
-const plural = (n: number, word: string) => `${n} ${word}${n > 1 ? 's' : ''}`;
-
 export default function Library() {
+  const t = useT();
   const [tab, setTab] = useState<Tab>('tracks');
   const [selected, setSelected] = useState<Set<number> | null>(null); // null = pas en mode sélection
   const { data } = useLibrary(
@@ -70,15 +66,15 @@ export default function Library() {
     [tab],
   );
 
-  const empty = <EmptyState icon="library" title="Rien ici pour l'instant" text={tab === 'liked' ? 'Appuie sur ♥ dans le lecteur pour aimer un titre.' : 'Scanne ton dossier musique depuis les réglages.'} />;
+  const empty = <EmptyState icon="library" title={t.library.empty} text={tab === 'liked' ? t.library.emptyLiked : t.library.emptyScan} />;
   const listStyle = { paddingHorizontal: space.sm, paddingBottom: layout.contentBottom };
 
   const trackTab = tab === 'tracks' || tab === 'liked';
   const shown = data.tracks ?? [];
-  const toggle = (t: Track) => {
+  const toggle = (track: Track) => {
     const next = new Set(selected);
-    if (next.has(t.id)) next.delete(t.id);
-    else next.add(t.id);
+    if (next.has(track.id)) next.delete(track.id);
+    else next.add(track.id);
     setSelected(next);
   };
   const openWithSelection = (pathname: '/track-edit' | '/album-lookup') => {
@@ -91,22 +87,22 @@ export default function Library() {
     <>
       <IconButton
         name="check"
-        label={selected.size === shown.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+        label={selected.size === shown.length ? t.library.deselectAll : t.library.selectAll}
         active={selected.size === shown.length && shown.length > 0}
-        onPress={() => setSelected(selected.size === shown.length ? new Set() : new Set(shown.map((t) => t.id)))}
+        onPress={() => setSelected(selected.size === shown.length ? new Set() : new Set(shown.map((track) => track.id)))}
       />
-      <IconButton name="search" label="Trouver leurs albums en ligne" onPress={() => openWithSelection('/album-lookup')} color={selected.size ? colors.accent : colors.textFaint} />
-      <IconButton name="edit" label="Modifier les titres choisis" onPress={() => openWithSelection('/track-edit')} color={selected.size ? colors.accent : colors.textFaint} />
-      <IconButton name="close" label="Quitter la sélection" onPress={() => setSelected(null)} />
+      <IconButton name="search" label={t.common.findAlbumsOnline} onPress={() => openWithSelection('/album-lookup')} color={selected.size ? colors.accent : colors.textFaint} />
+      <IconButton name="edit" label={t.library.editSelected} onPress={() => openWithSelection('/track-edit')} color={selected.size ? colors.accent : colors.textFaint} />
+      <IconButton name="close" label={t.library.exitSelection} onPress={() => setSelected(null)} />
     </>
   ) : (
-    <IconButton name="edit" label="Sélectionner des titres à modifier" onPress={() => setSelected(new Set())} />
+    <IconButton name="edit" label={t.library.startSelection} onPress={() => setSelected(new Set())} />
   );
 
   return (
     <Screen>
-      <PageTitle title={selected ? `${selected.size} choisi${selected.size > 1 ? 's' : ''}` : 'Bibliothèque'} right={titleRight} />
-      <Segments value={tab} onChange={(t) => { setTab(t); setSelected(null); }} />
+      <PageTitle title={selected ? t.library.selected(selected.size) : t.library.title} right={titleRight} />
+      <Segments value={tab} onChange={(next) => { setTab(next); setSelected(null); }} />
       {trackTab && (
         <TrackList tracks={shown} empty={empty} selection={selected ? { selected, onToggle: toggle } : undefined} />
       )}
@@ -117,7 +113,7 @@ export default function Library() {
           contentContainerStyle={listStyle}
           ListEmptyComponent={empty}
           renderItem={({ item }) => (
-            <GroupRow icon="disc" coverUri={item.coverUri} title={item.album} subtitle={`${item.artist} · ${plural(item.trackCount, 'titre')}`}
+            <GroupRow icon="disc" coverUri={item.coverUri} title={item.album} subtitle={`${item.artist} · ${t.common.tracks(item.trackCount)}`}
               onPress={() => router.push({ pathname: '/album/[id]', params: { id: item.album } })} />
           )}
         />
@@ -129,7 +125,7 @@ export default function Library() {
           contentContainerStyle={listStyle}
           ListEmptyComponent={empty}
           renderItem={({ item }) => (
-            <GroupRow icon="user" title={item.artist} subtitle={`${plural(item.albumCount, 'album')} · ${plural(item.trackCount, 'titre')}`}
+            <GroupRow icon="user" title={item.artist} subtitle={`${t.common.albums(item.albumCount)} · ${t.common.tracks(item.trackCount)}`}
               onPress={() => router.push({ pathname: '/artist/[id]', params: { id: item.artist } })} />
           )}
         />

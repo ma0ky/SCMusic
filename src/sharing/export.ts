@@ -4,6 +4,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { playlistTracks, playlists as allPlaylists } from '@/db/queries';
 import { buildExportPlan, MANIFEST_NAME, type ExportPlan } from './format';
+import { tr } from '@/i18n';
 
 async function collect(playlistIds: number[]) {
   const list = (await allPlaylists()).filter((p) => playlistIds.includes(p.id));
@@ -49,5 +50,5 @@ export async function sharePlaylistsJson(playlistIds: number[]): Promise<void> {
   const file = new File(Paths.cache, `scmusic-playlists-${stamp()}.json`);
   file.create({ overwrite: true });
   await file.write(JSON.stringify(plan.manifest, null, 2));
-  await Sharing.shareAsync(file.uri, { mimeType: 'application/json', dialogTitle: 'Partager mes playlists' });
+  await Sharing.shareAsync(file.uri, { mimeType: 'application/json', dialogTitle: tr().settings.shareDialog });
 }

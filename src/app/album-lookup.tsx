@@ -16,6 +16,7 @@ import { findAlbumOnline, REQUEST_INTERVAL_MS, type AlbumMatch } from '@/library
 import { parseIds } from '@/library/trackInfo';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { colors, layout, radius, space } from '@/theme/tokens';
+import { useT } from '@/i18n';
 
 type Result = ({ state: 'found'; match: AlbumMatch; checked: boolean } | { state: 'none' }) & { cached?: boolean };
 
@@ -30,6 +31,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export default function AlbumLookup() {
   const insets = useSafeAreaInsets();
+  const t = useT();
   const params = useLocalSearchParams<{ ids: string }>();
   const libraryChanged = usePlayerStore((s) => s.libraryChanged);
   const [tracks, setTracks] = useState<Track[] | null>(null);
@@ -44,9 +46,9 @@ export default function AlbumLookup() {
     // Résultats déjà connus d'abord : ces titres ne partiront pas sur le réseau
     Promise.all([tracksByIds(ids), cachedAlbumLookups(ids)]).then(([list, cache]) => {
       const known: Record<number, Result> = {};
-      for (const t of list) {
-        const c = cache.get(t.id);
-        if (c) known[t.id] = toResult(t, c, true);
+      for (const track of list) {
+        const c = cache.get(track.id);
+        if (c) known[track.id] = toResult(track, c, true);
       }
       setResults(known);
       setTracks(list);
@@ -59,31 +61,31 @@ export default function AlbumLookup() {
   if (!tracks) return <View style={styles.root} />;
 
   const done = Object.keys(results).length;
-  const toSearch = tracks.filter((t) => !results[t.id]).length;
-  const cachedCount = tracks.filter((t) => results[t.id]?.cached).length;
-  const found = tracks.filter((t) => results[t.id]?.state === 'found');
-  const checked = found.filter((t) => (results[t.id] as { checked: boolean }).checked);
+  const toSearch = tracks.filter((track) => !results[track.id]).length;
+  const cachedCount = tracks.filter((track) => results[track.id]?.cached).length;
+  const found = tracks.filter((track) => results[track.id]?.state === 'found');
+  const checked = found.filter((track) => (results[track.id] as { checked: boolean }).checked);
 
   const start = async () => {
     const controller = new AbortController();
     abort.current = controller;
     setRunning(true);
     try {
-      const pending = tracks.filter((t) => !results[t.id]); // déjà cherchés : pas de nouvelle requête
+      const pending = tracks.filter((track) => !results[track.id]); // déjà cherchés : pas de nouvelle requête
       for (let i = 0; i < pending.length; i++) {
-        const t = pending[i];
+        const track = pending[i];
         if (controller.signal.aborted) break;
         let result: Result;
         try {
-          const match = await findAlbumOnline(t, controller.signal);
-          await saveAlbumLookup(t, match);
-          result = toResult(t, match);
+          const match = await findAlbumOnline(track, controller.signal);
+          await saveAlbumLookup(track, match);
+          result = toResult(track, match);
         } catch (e) {
           if (controller.signal.aborted) break;
-          Alert.alert('Recherche interrompue', e instanceof Error ? e.message : String(e));
+          Alert.alert(t.albumLookup.interrupted, e instanceof Error ? e.message : String(e));
           break;
         }
-        setResults((r) => ({ ...r, [t.id]: result }));
+        setResults((r) => ({ ...r, [track.id]: result }));
         if (i < pending.length - 1) await sleep(REQUEST_INTERVAL_MS);
       }
     } finally {
@@ -101,15 +103,15 @@ export default function AlbumLookup() {
   const apply = async () => {
     setApplying(true);
     try {
-      for (const t of checked) {
-        const { match } = results[t.id] as { match: AlbumMatch };
+      for (const track of checked) {
+        const { match } = results[track.id] as { match: AlbumMatch };
         // Le numéro de piste n'est ajouté que s'il manquait
-        await editTrackInfo([t.id], { album: match.album, trackNo: t.trackNo == null && match.trackNo != null ? match.trackNo : undefined });
+        await editTrackInfo([track.id], { album: match.album, trackNo: track.trackNo == null && match.trackNo != null ? match.trackNo : undefined });
       }
       libraryChanged();
       router.back();
     } catch (e) {
-      Alert.alert('Erreur', e instanceof Error ? e.message : String(e));
+      Alert.alert(t.common.error, e instanceof Error ? e.message : String(e));
       setApplying(false);
     }
   };
@@ -120,34 +122,29 @@ export default function AlbumLookup() {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <Background />
       <DetailHeader
-        title="Trouver les albums"
-        subtitle={running ? `Recherche… ${done} / ${tracks.length}` : `${found.length} proposition(s) · ${toSearch} titre(s) à chercher`}
+        title={t.albumLookup.title}
+        subtitle={running ? t.albumLookup.progress(done, tracks.length) : t.albumLookup.summary(found.length, toSearch)}
         icon="down"
       />
       <FlatList
         data={tracks}
-        keyExtractor={(t) => String(t.id)}
+        keyExtractor={(track) => String(track.id)}
         contentContainerStyle={{ padding: layout.gutter, gap: space.sm, paddingBottom: space.xxl }}
         ListHeaderComponent={
           <View style={{ gap: space.md, marginBottom: space.md }}>
             {cachedCount > 0 && (
-              <Txt variant="muted">
-                {cachedCount} titre(s) déjà cherché(s) : résultat enregistré sur le téléphone, sans nouvelle connexion.
-              </Txt>
+              <Txt variant="muted">{t.albumLookup.cached(cachedCount)}</Txt>
             )}
             {!running && toSearch > 0 && (
               <GlassCard style={styles.card}>
-                <Txt variant="muted">
-                  {toSearch} titre(s) jamais cherché(s) : SCMusic envoie leur titre et artiste à musicbrainz.org (base musicale libre),
-                  un par seconde, environ {seconds} s. Les résultats sont gardés pour ne plus avoir à redemander. Tes fichiers ne sont pas modifiés.
-                </Txt>
-                <Button title={done > cachedCount ? 'Reprendre la recherche' : 'Lancer la recherche'} icon="search" onPress={start} />
+                <Txt variant="muted">{t.albumLookup.privacy(toSearch, seconds)}</Txt>
+                <Button title={done > cachedCount ? t.albumLookup.resume : t.albumLookup.start} icon="search" onPress={start} />
               </GlassCard>
             )}
-            {running && <Button title="Arrêter" kind="ghost" icon="close" onPress={() => abort.current?.abort()} />}
+            {running && <Button title={t.albumLookup.stop} kind="ghost" icon="close" onPress={() => abort.current?.abort()} />}
           </View>
         }
-        ListEmptyComponent={<EmptyState icon="disc" title="Aucun titre" text="Les titres choisis n'existent plus dans la bibliothèque." />}
+        ListEmptyComponent={<EmptyState icon="disc" title={t.common.noTrack} text={t.common.tracksGone} />}
         renderItem={({ item }) => {
           const res = results[item.id];
           const on = res?.state === 'found' && res.checked;
@@ -165,13 +162,13 @@ export default function AlbumLookup() {
                 {res?.state === 'found' ? (
                   <Txt numberOfLines={2} style={{ color: colors.accent }}>
                     → {res.match.album}
-                    {res.match.trackNo && item.trackNo == null ? ` · piste ${res.match.trackNo}` : ''}
+                    {res.match.trackNo && item.trackNo == null ? t.albumLookup.track(res.match.trackNo) : ''}
                     {res.match.year ? ` · ${res.match.year}` : ''}
                   </Txt>
                 ) : res ? (
-                  <Txt variant="muted">Rien de nouveau trouvé</Txt>
+                  <Txt variant="muted">{t.albumLookup.nothingNew}</Txt>
                 ) : null}
-                {res?.cached && <Txt variant="caption">déjà cherché</Txt>}
+                {res?.cached && <Txt variant="caption">{t.albumLookup.alreadySearched}</Txt>}
               </View>
               {res?.state === 'found' && (
                 <View style={[styles.check, on && styles.checkOn]}>{on && <Icon name="check" size={16} color={colors.bg} />}</View>
@@ -183,7 +180,7 @@ export default function AlbumLookup() {
       {!running && found.length > 0 && (
         <View style={[styles.footer, { paddingBottom: insets.bottom + space.md }]}>
           <Button
-            title={applying ? 'Application…' : `Appliquer (${checked.length})`}
+            title={applying ? t.albumLookup.applying : t.albumLookup.apply(checked.length)}
             icon="check"
             onPress={apply}
             disabled={applying || checked.length === 0}

@@ -18,18 +18,12 @@ import { bucketsFor, COUNT_AFTER, fillBuckets, formatListening, longLabel, type 
 import { useLibrary } from '@/store/useLibrary';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { colors, font, layout, radius, space } from '@/theme/tokens';
+import { useLang, useT } from '@/i18n';
 
-const PERIODS: { key: Period; label: string }[] = [
-  { key: 'week', label: '7 jours' },
-  { key: 'month', label: '30 jours' },
-  { key: 'year', label: '12 mois' },
-  { key: 'all', label: 'Toujours' },
-];
+const PERIODS: Period[] = ['week', 'month', 'year', 'all'];
 
 /** "Oublié" = plus écouté depuis 60 jours. */
 const FORGOTTEN_AFTER_MS = 60 * 24 * 60 * 60 * 1000;
-
-const plural = (n: number, word: string) => `${n} ${word}${n > 1 ? 's' : ''}`;
 
 async function loadStats(period: Period) {
   const now = new Date();
@@ -50,13 +44,14 @@ async function loadStats(period: Period) {
 type Stats = Awaited<ReturnType<typeof loadStats>>;
 
 function Segments({ value, onChange }: { value: Period; onChange: (p: Period) => void }) {
+  const t = useT();
   return (
     <View style={styles.segments}>
       {PERIODS.map((p) => {
-        const on = p.key === value;
+        const on = p === value;
         return (
-          <Pressable key={p.key} onPress={() => onChange(p.key)} style={[styles.segment, on && styles.segmentOn]} accessibilityRole="tab" accessibilityState={{ selected: on }}>
-            <Txt style={{ color: on ? colors.bg : colors.textMuted, fontWeight: '700', fontSize: 13 }}>{p.label}</Txt>
+          <Pressable key={p} onPress={() => onChange(p)} style={[styles.segment, on && styles.segmentOn]} accessibilityRole="tab" accessibilityState={{ selected: on }}>
+            <Txt style={{ color: on ? colors.bg : colors.textMuted, fontWeight: '700', fontSize: 13 }}>{t.stats.periods[p]}</Txt>
           </Pressable>
         );
       })}
@@ -78,13 +73,14 @@ function Rank({ n }: { n: number }) {
 }
 
 function GroupRow({ rank, group, onPress }: { rank: number; group: TopGroup; onPress: () => void }) {
+  const t = useT();
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.group, pressed && { backgroundColor: colors.glass }]}>
       <Rank n={rank} />
       <Cover uri={group.coverUri} size={44} />
       <View style={{ flex: 1 }}>
         <Txt numberOfLines={1}>{group.name}</Txt>
-        <Txt variant="muted" numberOfLines={1}>{plural(group.plays, 'écoute')} · {formatListening(group.seconds)}</Txt>
+        <Txt variant="muted" numberOfLines={1}>{t.common.plays(group.plays)} · {formatListening(group.seconds)}</Txt>
       </View>
     </Pressable>
   );
@@ -92,43 +88,44 @@ function GroupRow({ rank, group, onPress }: { rank: number; group: TopGroup; onP
 
 export default function StatsScreen() {
   const insets = useSafeAreaInsets();
+  const t = useT();
+  const lang = useLang();
   const playTracks = usePlayerStore((s) => s.playTracks);
   const libraryChanged = usePlayerStore((s) => s.libraryChanged);
   const [period, setPeriod] = useState<Period>('week');
-  const { data, loading } = useLibrary<Stats | null>(() => loadStats(period), null, [period]);
+  const { data, loading } = useLibrary<Stats | null>(() => loadStats(period), null, [period, lang]); // libellés des dates dans la langue choisie
 
-  const playList = (list: TopTrack[], i: number) => playTracks(list.map((t) => t.track), i);
+  const playList = (list: TopTrack[], i: number) => playTracks(list.map((top) => top.track), i);
   const shuffled = (list: Track[]) => [...list].sort(() => Math.random() - 0.5);
 
   const reset = () =>
-    Alert.alert('Effacer l’historique ?', 'Toutes tes statistiques d’écoute seront supprimées. Tes titres et playlists restent.', [
-      { text: 'Annuler', style: 'cancel' },
-      { text: 'Effacer', style: 'destructive', onPress: () => clearPlays().then(libraryChanged) },
+    Alert.alert(t.stats.clearConfirm, t.stats.clearText, [
+      { text: t.common.cancel, style: 'cancel' },
+      { text: t.stats.clearButton, style: 'destructive', onPress: () => clearPlays().then(libraryChanged) },
     ]);
 
   const body = () => {
     if (!data) return null;
     const { buckets, totals, values, tracks, artists, albums, forgotten, never } = data;
-    const unitWord = buckets.unit === 'day' ? 'par jour' : 'par mois';
 
     return (
       <>
         <View style={styles.tiles}>
-          <Tile value={formatListening(totals.seconds)} label="d’écoute" />
-          <Tile value={String(totals.plays)} label={totals.plays > 1 ? 'écoutes' : 'écoute'} />
+          <Tile value={formatListening(totals.seconds)} label={t.stats.listened} />
+          <Tile value={String(totals.plays)} label={t.stats.playsLabel(totals.plays)} />
         </View>
         <View style={styles.tiles}>
-          <Tile value={String(totals.tracks)} label={totals.tracks > 1 ? 'titres différents' : 'titre différent'} />
-          <Tile value={String(totals.artists)} label={totals.artists > 1 ? 'artistes' : 'artiste'} />
+          <Tile value={String(totals.tracks)} label={t.stats.tracksLabel(totals.tracks)} />
+          <Tile value={String(totals.artists)} label={t.stats.artistsLabel(totals.artists)} />
         </View>
 
         {totals.plays === 0 ? (
           <GlassCard style={{ marginTop: space.lg }}>
-            <EmptyState icon="stats" title="Pas encore d’écoute" text={`Rien sur cette période. Un titre compte comme écouté après ${COUNT_AFTER} secondes.`} />
+            <EmptyState icon="stats" title={t.stats.noPlays} text={t.stats.noPlaysText(COUNT_AFTER)} />
           </GlassCard>
         ) : (
           <>
-            <SectionTitle>Temps d’écoute {unitWord}</SectionTitle>
+            <SectionTitle>{buckets.unit === 'day' ? t.stats.timePerDay : t.stats.timePerMonth}</SectionTitle>
             <GlassCard style={styles.card}>
               <BarChart
                 key={period}
@@ -138,22 +135,22 @@ export default function StatsScreen() {
               />
             </GlassCard>
 
-            <SectionTitle>Titres les plus écoutés</SectionTitle>
-            {tracks.map((t, i) => (
-              <View key={t.track.id} style={styles.ranked}>
+            <SectionTitle>{t.stats.topTracks}</SectionTitle>
+            {tracks.map((top, i) => (
+              <View key={top.track.id} style={styles.ranked}>
                 <Rank n={i + 1} />
                 <View style={{ flex: 1 }}>
-                  <TrackRow track={t.track} onPress={() => playList(tracks, i)} subtitle={`${t.track.artist} · ${plural(t.plays, 'écoute')}`} />
+                  <TrackRow track={top.track} onPress={() => playList(tracks, i)} subtitle={`${top.track.artist} · ${t.common.plays(top.plays)}`} />
                 </View>
               </View>
             ))}
 
-            <SectionTitle>Artistes les plus écoutés</SectionTitle>
+            <SectionTitle>{t.stats.topArtists}</SectionTitle>
             {artists.map((a, i) => (
               <GroupRow key={a.name} rank={i + 1} group={a} onPress={() => router.push({ pathname: '/artist/[id]', params: { id: a.name } })} />
             ))}
 
-            <SectionTitle>Albums les plus écoutés</SectionTitle>
+            <SectionTitle>{t.stats.topAlbums}</SectionTitle>
             {albums.map((a, i) => (
               <GroupRow key={a.name} rank={i + 1} group={a} onPress={() => router.push({ pathname: '/album/[id]', params: { id: a.name } })} />
             ))}
@@ -162,27 +159,27 @@ export default function StatsScreen() {
 
         {forgotten.length > 0 && (
           <>
-            <SectionTitle>À redécouvrir</SectionTitle>
-            <Txt variant="muted" style={styles.hint}>Tu les écoutais souvent, mais plus depuis deux mois.</Txt>
-            {forgotten.map((t, i) => (
-              <TrackRow key={t.track.id} track={t.track} onPress={() => playList(forgotten, i)} subtitle={`${t.track.artist} · ${plural(t.plays, 'écoute')}`} />
+            <SectionTitle>{t.stats.forgotten}</SectionTitle>
+            <Txt variant="muted" style={styles.hint}>{t.stats.forgottenText}</Txt>
+            {forgotten.map((top, i) => (
+              <TrackRow key={top.track.id} track={top.track} onPress={() => playList(forgotten, i)} subtitle={`${top.track.artist} · ${t.common.plays(top.plays)}`} />
             ))}
           </>
         )}
 
         {never.length > 0 && (
           <>
-            <SectionTitle>Jamais écoutés</SectionTitle>
+            <SectionTitle>{t.stats.never}</SectionTitle>
             <GlassCard style={styles.card}>
-              <Txt>{plural(never.length, 'titre')} de ta bibliothèque {never.length > 1 ? 'n’ont' : 'n’a'} jamais été écouté{never.length > 1 ? 's' : ''}.</Txt>
-              <Button title="Les écouter en aléatoire" icon="shuffle" onPress={() => playTracks(shuffled(never))} />
+              <Txt>{t.stats.neverText(never.length)}</Txt>
+              <Button title={t.stats.neverPlay} icon="shuffle" onPress={() => playTracks(shuffled(never))} />
             </GlassCard>
           </>
         )}
 
         <View style={{ marginTop: space.xxl, gap: space.md }}>
-          <Txt variant="muted">Calculées sur ton téléphone, jamais envoyées. Un titre compte après {COUNT_AFTER} s d’écoute (sauts dans le morceau non comptés).</Txt>
-          <Button title="Effacer l’historique d’écoute" kind="danger" icon="trash" onPress={reset} />
+          <Txt variant="muted">{t.stats.footer(COUNT_AFTER)}</Txt>
+          <Button title={t.stats.clear} kind="danger" icon="trash" onPress={reset} />
         </View>
       </>
     );
@@ -191,7 +188,7 @@ export default function StatsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
       <Background />
-      <DetailHeader title="Statistiques" subtitle={loading ? 'Calcul…' : undefined} />
+      <DetailHeader title={t.stats.title} subtitle={loading ? t.stats.computing : undefined} />
       <ScrollView contentContainerStyle={{ paddingHorizontal: layout.gutter, paddingTop: space.md, paddingBottom: insets.bottom + space.xxl }}>
         <Segments value={period} onChange={setPeriod} />
         {body()}
