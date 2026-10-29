@@ -40,6 +40,7 @@ export default function RootLayout() {
         <Stack.Screen name="queue" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="lyrics-edit" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="track-edit" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="album-lookup" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
       </Stack>
       <UpdateProgress progress={updater.progress} />
     </>

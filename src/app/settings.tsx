@@ -178,7 +178,7 @@ export default function Settings() {
         </GlassCard>
 
         <SectionTitle>À propos</SectionTitle>
-        <Txt variant="muted">SCMusic, logiciel libre sous licence GPL-3.0. Tes fichiers et ta bibliothèque ne quittent jamais ton téléphone. Seules connexions : la recherche de paroles quand tu la demandes, et la vérification des mises à jour.</Txt>
+        <Txt variant="muted">SCMusic, logiciel libre sous licence GPL-3.0. Tes fichiers et ta bibliothèque ne quittent jamais ton téléphone. Seules connexions : la recherche de paroles ou d’albums quand tu la demandes, et la vérification des mises à jour.</Txt>
       </ScrollView>
       <UpdateProgress progress={updater.progress} />
     </View>

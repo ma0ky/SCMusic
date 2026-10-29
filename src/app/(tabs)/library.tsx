@@ -81,9 +81,9 @@ export default function Library() {
     else next.add(t.id);
     setSelected(next);
   };
-  const editSelected = () => {
+  const openWithSelection = (pathname: '/track-edit' | '/album-lookup') => {
     if (!selected?.size) return;
-    router.push({ pathname: '/track-edit', params: { ids: [...selected].join(',') } });
+    router.push({ pathname, params: { ids: [...selected].join(',') } });
     setSelected(null);
   };
 
@@ -95,7 +95,8 @@ export default function Library() {
         active={selected.size === shown.length && shown.length > 0}
         onPress={() => setSelected(selected.size === shown.length ? new Set() : new Set(shown.map((t) => t.id)))}
       />
-      <IconButton name="edit" label="Modifier les titres choisis" onPress={editSelected} color={selected.size ? colors.accent : colors.textFaint} />
+      <IconButton name="search" label="Trouver leurs albums en ligne" onPress={() => openWithSelection('/album-lookup')} color={selected.size ? colors.accent : colors.textFaint} />
+      <IconButton name="edit" label="Modifier les titres choisis" onPress={() => openWithSelection('/track-edit')} color={selected.size ? colors.accent : colors.textFaint} />
       <IconButton name="close" label="Quitter la sélection" onPress={() => setSelected(null)} />
     </>
   ) : (

@@ -44,8 +44,16 @@ export default function Album() {
         header={
           <View style={{ padding: space.md, gap: space.lg, alignItems: 'center' }}>
             <Cover uri={tracks.find((t) => t.coverUri)?.coverUri} size={220} rounded={radius.lg} />
-            <View style={{ alignSelf: 'stretch' }}>
+            <View style={{ alignSelf: 'stretch', gap: space.sm }}>
               <Button title="Lire l'album" icon="play" onPress={() => playTracks(tracks)} disabled={tracks.length === 0} />
+              {id === 'Album inconnu' && tracks.length > 0 && (
+                <Button
+                  title="Trouver leurs albums en ligne"
+                  kind="ghost"
+                  icon="search"
+                  onPress={() => router.push({ pathname: '/album-lookup', params: { ids: tracks.map((t) => t.id).join(',') } })}
+                />
+              )}
             </View>
           </View>
         }

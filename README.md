@@ -2,7 +2,7 @@
 
 Lecteur de musique **local, libre et open source** (GPL-3.0) pour Android, construit avec Expo / React Native.
 Il lit les MP3 et FLAC que tu possèdes, sans compte, sans serveur, sans publicité.
-Il ne se connecte à Internet que pour deux choses : chercher des paroles quand tu le demandes, et vérifier les mises à jour (une fois par jour au plus, désactivable).
+Il ne se connecte à Internet que pour chercher des paroles ([LRCLIB](https://lrclib.net)) ou des albums ([MusicBrainz](https://musicbrainz.org)) quand tu le demandes (titre et artiste seulement), et pour vérifier les mises à jour (une fois par jour au plus, désactivable).
 
 ## Fonctionnalités (MVP)
 
@@ -16,6 +16,7 @@ Il ne se connecte à Internet que pour deux choses : chercher des paroles quand 
   - ou un fichier `nom.lrc` à côté de `nom.mp3`, ou les paroles intégrées au fichier (USLT / LYRICS), lus à l'analyse
 - **Statistiques** (bouton graphique de l'accueil) : temps d'écoute, nombre d'écoutes, titres / artistes / albums les plus écoutés sur 7 jours, 30 jours, 12 mois ou depuis toujours, graphique par jour ou par mois, titres à redécouvrir et jamais écoutés. Un titre compte après 30 s d'écoute réelle (les sauts ne comptent pas). Tout est calculé sur le téléphone
 - **Modifier les infos** (titre, artiste, album, n° de piste) **dans l'app**, sans toucher aux fichiers : menu `…` → *Modifier les infos*, ou **Bibliothèque → crayon** pour cocher plusieurs titres et leur donner le même album (créer un album) ou artiste, ou **crayon d'un album** pour le renommer. *Revenir aux infos des fichiers* annule. Un nouveau scan n'écrase pas ces modifications
+- **Trouver les albums en ligne** : Bibliothèque → crayon → cocher des titres → loupe, ou bouton sur l'album « Album inconnu ». SCMusic interroge [MusicBrainz](https://musicbrainz.org) (un titre par seconde), propose l'album le plus probable (album studio plutôt que compilation, single ou bande originale) et le n° de piste ; tu coches ce que tu appliques
 - **Recherche** : titres, artistes et albums (accents et majuscules ignorés)
 - **Partage** : export / import de playlists entre deux téléphones, dans le respect du droit d'auteur (voir plus bas)
 
