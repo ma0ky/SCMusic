@@ -1,6 +1,6 @@
 {
   "name": "scmusic",
-  "version": "3.4.0",
+  "version": "3.4.1",
   "main": "expo-router/entry",
   "dependencies": {
     "expo": "~58.0.20",
