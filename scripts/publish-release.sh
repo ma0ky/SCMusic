@@ -11,5 +11,15 @@ NOTES="${1:-SCMusic $VERSION}"
 [ -f "$APK" ] && [ -f "$APK.sha256" ] || { echo "APK signé introuvable : lance d'abord npm run apk && npm run apk:sign"; exit 1; }
 gh release view "v$VERSION" --repo "$REPO" >/dev/null 2>&1 && { echo "La version v$VERSION est déjà publiée sur $REPO"; exit 1; }
 
-gh release create "v$VERSION" "$APK" "$APK.sha256" --repo "$REPO" --title "SCMusic $VERSION" --notes "$NOTES"
+# L'empreinte publiée doit correspondre à l'APK (sinon les téléphones refuseraient la mise à jour)
+(cd dist && sha256sum -c "SCMusic-$VERSION.apk.sha256") || { echo "Empreinte et APK ne correspondent pas"; exit 1; }
+
+# Pas de publication avec une faille haute / critique non traitée (voir SECURITY.md)
+node scripts/audit.mjs
+
+# Liste des composants (SBOM CycloneDX), publiée avec la version
+SBOM="dist/SCMusic-$VERSION.sbom.json"
+npm sbom --sbom-format cyclonedx > "$SBOM"
+
+gh release create "v$VERSION" "$APK" "$APK.sha256" "$SBOM" --repo "$REPO" --title "SCMusic $VERSION" --notes "$NOTES"
 echo "Publié : https://github.com/$REPO/releases/tag/v$VERSION"

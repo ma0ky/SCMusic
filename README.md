@@ -60,6 +60,8 @@ npm run apk:publish -- "Ce qui change dans cette version"
 ```
 
 Toujours signer avec la même clé (`~/.scmusic-keys`) : Android refuse une mise à jour signée avec une autre clé.
+La publication vérifie l'empreinte, lance l'audit des dépendances (bloquant si faille haute non traitée) et joint la liste des composants (SBOM).
+Décisions de sécurité, gestion de la clé et procédure complète : [SECURITY.md](SECURITY.md).
 
 ## Commandes utiles
 

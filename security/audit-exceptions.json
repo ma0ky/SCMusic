@@ -1,0 +1,12 @@
+{
+  "_comment": "Failles hautes/critiques acceptées temporairement, avec justification. Une exception expire à reviewBy : l'audit bloque alors la publication jusqu'à réévaluation. Voir SECURITY.md.",
+  "exceptions": [
+    {
+      "id": "GHSA-mrhx-c7xc-m3w5",
+      "package": "zod",
+      "reason": "Outil de build seulement (@expo/cli, eslint-plugin-react-hooks) : absent de l'APK, vérifié dans le bundle. Ne valide que nos propres fichiers de config. Correction attendue avec le prochain SDK Expo.",
+      "accepted": "2026-10-29",
+      "reviewBy": "2027-01-27"
+    }
+  ]
+}
