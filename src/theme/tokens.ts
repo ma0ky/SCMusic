@@ -3,20 +3,20 @@
 import { Platform } from 'react-native';
 
 export const colors = {
-  accent: '#8b7bff', // couleur principale
-  accentSoft: 'rgba(139, 123, 255, 0.18)',
-  accentGlow: 'rgba(139, 123, 255, 0.45)',
-  bg: '#0d0b1a', // fond de l'app
-  bgGradientTop: '#1c1640',
+  accent: '#9a9de0', // couleur principale (lavande du « [sc] » du logo)
+  accentSoft: 'rgba(154, 157, 224, 0.18)',
+  accentGlow: 'rgba(154, 157, 224, 0.45)',
+  bg: '#06070c', // fond de l'app (fond du logo)
+  bgGradientTop: '#1a1c38',
   glass: 'rgba(255, 255, 255, 0.06)', // surfaces "verre"
   glassStrong: 'rgba(255, 255, 255, 0.10)',
   glassBorder: 'rgba(255, 255, 255, 0.12)',
-  text: '#f2f0ff',
-  textMuted: 'rgba(242, 240, 255, 0.6)',
-  textFaint: 'rgba(242, 240, 255, 0.35)',
+  text: '#eceefb',
+  textMuted: 'rgba(236, 238, 251, 0.6)',
+  textFaint: 'rgba(236, 238, 251, 0.35)',
   danger: '#ff6b8b',
   liked: '#ff7bd5',
-  overlay: 'rgba(5, 4, 12, 0.7)',
+  overlay: 'rgba(4, 5, 10, 0.7)',
 } as const;
 
 export const radius = {
