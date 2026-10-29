@@ -2,6 +2,7 @@
 // et à chaque statut du lecteur. Une écoute est écrite dès qu'elle compte (30 s),
 // puis mise à jour régulièrement : rien n'est perdu si l'app est fermée en cours de route.
 import type { AudioStatus } from 'expo-audio';
+import { logWarn } from '@/log';
 import { insertPlay, updatePlay } from '@/db/queries';
 import type { Track } from '@/db/types';
 import { advance, countsAsPlay, isComplete, newSession, type ListenSession } from './listening';
@@ -30,7 +31,7 @@ function save(l: Live, final: boolean): void {
       if (l.playId == null) l.playId = await insertPlay(trackId, startedAt, listened, completed);
       else await updatePlay(l.playId, listened, completed);
     })
-    .catch((e) => console.warn('Statistiques :', e));
+    .catch((e) => logWarn('Statistiques :', e));
 }
 
 /** Termine l'écoute en cours (morceau suivant, fin de file…). */

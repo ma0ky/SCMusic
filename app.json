@@ -2,7 +2,7 @@
   "expo": {
     "name": "SCMusic",
     "slug": "scmusic",
-    "version": "3.3.1",
+    "version": "3.3.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -17,9 +17,12 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "org.scmusic.app",
-      "versionCode": 7,
+      "versionCode": 8,
       "blockedPermissions": [
-        "android.permission.SYSTEM_ALERT_WINDOW"
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.VIBRATE"
       ],
       "permissions": [
         "android.permission.REQUEST_INSTALL_PACKAGES"
@@ -41,9 +44,16 @@
       ],
       "expo-sqlite",
       "expo-sharing",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 29
+          }
+        }
+      ]
     ],
-    "scheme": "scmusic",
     "experiments": {
       "typedRoutes": true
     }

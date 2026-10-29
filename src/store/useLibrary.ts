@@ -1,6 +1,7 @@
 // Petit hook de chargement : relance la requête quand la bibliothèque change
 // (scan, "j'aime", playlist modifiée…) ou quand ses dépendances changent.
 import { useEffect, useState } from 'react';
+import { logWarn } from '@/log';
 import { usePlayerStore } from './usePlayerStore';
 
 export function useLibrary<T>(load: () => Promise<T>, initial: T, deps: unknown[] = []): { data: T; loading: boolean } {
@@ -13,7 +14,7 @@ export function useLibrary<T>(load: () => Promise<T>, initial: T, deps: unknown[
     let alive = true;
     load()
       .then((data) => alive && setResult({ key, data }))
-      .catch((e) => console.warn('Chargement impossible :', e));
+      .catch((e) => logWarn('Chargement impossible :', e));
     return () => {
       alive = false;
     };

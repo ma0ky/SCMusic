@@ -1,6 +1,7 @@
 // Pilote audio : un seul lecteur expo-audio pour toute l'application.
 // Il ne connaît rien de la file d'attente : le store lui dit quoi jouer.
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer, type AudioStatus } from 'expo-audio';
+import { logWarn } from '@/log';
 import type { Track } from '@/db/types';
 
 let player: AudioPlayer | null = null;
@@ -14,7 +15,7 @@ export function getPlayer(): AudioPlayer {
       playsInSilentMode: true,
       shouldPlayInBackground: true,
       interruptionMode: 'doNotMix',
-    }).catch((e) => console.warn('Mode audio :', e));
+    }).catch((e) => logWarn('Mode audio :', e));
   }
   return player;
 }

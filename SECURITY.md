@@ -35,6 +35,19 @@ Hors périmètre : un téléphone rooté ou déjà compromis, et l'accès physiq
 
 Les fichiers audio ne sont jamais modifiés par l'app.
 
+**Journaux (MASVS-STORAGE-2) :** la version publiée n'écrit rien dans logcat (`logWarn` dans [src/log.ts](src/log.ts), actif seulement en développement). Les messages contiendraient des noms de fichiers, lisibles par adb, les rapports de bug et les apps système. Ne pas utiliser `console.*` directement.
+
+**Cloisonnement (MASVS-PLATFORM-1, PRIVACY-1) :**
+- **Ce que l'app voit :** seulement ce que l'utilisateur choisit dans le sélecteur d'Android (dossier de musique, image, fichier de partage). Aucune permission de stockage global : `READ_EXTERNAL_STORAGE` et `WRITE_EXTERNAL_STORAGE` sont bloquées, tout comme `VIBRATE` et `SYSTEM_ALERT_WINDOW`, inutiles.
+- **Ce que les autres apps voient de SCMusic :**
+  - pas de schéma de lien (`scmusic://` retiré), donc aucune app ni page web ne peut ouvrir un écran avec ses paramètres ;
+  - seule l'icône du lanceur ouvre l'app ;
+  - les services et fournisseurs de fichiers ne sont pas exportés ;
+  - un fichier partagé n'est lisible que par l'app choisie par l'utilisateur, et seulement pour ce fichier.
+- **Exception voulue :** les contrôles de lecture (écran verrouillé, notification, Bluetooth) passent par la session média d'Android.
+
+**Version d'Android (MASVS-CODE-1) :** Android 10 minimum (`minSdkVersion` 29). Les versions plus anciennes ne reçoivent plus de correctifs de sécurité.
+
 ## Communications (ASVS 13.1, 13.2)
 
 La liste des connexions, avec le moment où elles ont lieu, est dans le [README](README.md).

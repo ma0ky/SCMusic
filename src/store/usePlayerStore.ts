@@ -1,6 +1,7 @@
 // État global du lecteur (Zustand) : file d'attente + actions appelées par les écrans.
 // La logique de file vient de player/queue.ts, le son de player/engine.ts, les statistiques de stats/tracker.ts.
 import { create } from 'zustand';
+import { logWarn } from '@/log';
 import * as Q from '@/player/queue';
 import * as engine from '@/player/engine';
 import * as tracker from '@/stats/tracker';
@@ -199,7 +200,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => {
 
     libraryChanged: () => {
       set({ libraryVersion: get().libraryVersion + 1 });
-      refreshQueue().catch((e) => console.warn('File d’attente :', e));
+      refreshQueue().catch((e) => logWarn('File d’attente :', e));
     },
   };
 });

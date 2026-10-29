@@ -1,6 +1,7 @@
 // Parcourt le dossier musique choisi par l'utilisateur et remplit la base.
 // Sur Android, le dossier est choisi via le sélecteur système (accès SAF, URIs content://).
 import { Directory, File, FileMode } from 'expo-file-system';
+import { logWarn } from '@/log';
 import {
   getSetting, insertTrack, knownUris, removeTracksNotIn, setScannedCover, setScannedLyrics, setSetting, urisWithoutCoverCheck,
   urisWithoutLyricsCheck, type CoverSource,
@@ -105,7 +106,7 @@ async function findCover(
     try {
       return await save();
     } catch (e) {
-      console.warn('Image ignorée :', name, e instanceof Error ? e.message : e);
+      logWarn('Image ignorée :', name, e instanceof Error ? e.message : e);
       return null;
     }
   };
@@ -132,7 +133,7 @@ async function findLyrics(lrc: File | null, fromTags: string | undefined): Promi
       const text = cleanLyrics(await lrc.text());
       if (text) return text;
     } catch (e) {
-      console.warn('Paroles illisibles :', lrc.name, e);
+      logWarn('Paroles illisibles :', lrc.name, e);
     }
   }
   return cleanLyrics(fromTags);
@@ -186,7 +187,7 @@ export async function scanLibrary(dirUri: string, onProgress?: (p: ScanProgress)
         }
         if (!isNew) await setScannedLyrics(file.uri, lyrics);
       } catch (e) {
-        console.warn('Lecture impossible :', file.name, e);
+        logWarn('Lecture impossible :', file.name, e);
         failed++;
       }
     }
@@ -197,7 +198,7 @@ export async function scanLibrary(dirUri: string, onProgress?: (p: ScanProgress)
           await setScannedCover(file.uri, await saveCoverFromFile(sidecar), 'file');
           covers++;
         } catch (e) {
-          console.warn('Image illisible :', sidecar.name, e);
+          logWarn('Image illisible :', sidecar.name, e);
         }
       }
       if (lrc && !lyricsToCheck) {
