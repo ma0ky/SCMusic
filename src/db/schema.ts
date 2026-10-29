@@ -94,6 +94,16 @@ const MIGRATIONS: string[] = [
     looked_up_at INTEGER NOT NULL
   );
   `,
+  // v7 : recherches de paroles en ligne restées sans résultat, pour ne pas redemander la même chose.
+  // (Les paroles trouvées, elles, sont enregistrées dans tracks.lyrics.)
+  `
+  CREATE TABLE IF NOT EXISTS lyrics_lookups (
+    track_id     INTEGER PRIMARY KEY REFERENCES tracks(id) ON DELETE CASCADE,
+    query_title  TEXT NOT NULL,
+    query_artist TEXT NOT NULL,
+    looked_up_at INTEGER NOT NULL
+  );
+  `,
 ];
 
 export async function migrate(): Promise<void> {

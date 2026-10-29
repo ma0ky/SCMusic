@@ -9,7 +9,7 @@ import { DetailHeader } from '@/components/Header';
 import { Background } from '@/components/Screen';
 import { Button, EmptyState, formatTime, GlassCard, Txt } from '@/components/ui';
 import { setTrackLyrics, trackLyrics } from '@/db/queries';
-import { searchLyricsOnline } from '@/library/lrclib';
+import { formatDay, searchLyricsOnline } from '@/library/lrclib';
 import { cleanLyrics, lyricsToPlainText, toLrc } from '@/library/lyrics';
 import { getPlayer } from '@/player/engine';
 import { useCurrentTrack, usePlayerStore } from '@/store/usePlayerStore';
@@ -53,11 +53,17 @@ export default function LyricsEdit() {
     router.back();
   };
 
-  const searchOnline = async () => {
+  const searchOnline = async (force = false) => {
     setBusy(true);
     try {
-      const found = await searchLyricsOnline(track);
-      if (!found) {
+      const result = await searchLyricsOnline(track, force);
+      const found = result.kind === 'found' ? result.lyrics : null;
+      if (result.kind === 'already') {
+        Alert.alert('Déjà cherché', `LRCLIB n'avait rien pour « ${track.title} » le ${formatDay(result.at)}. Pour ne pas redemander, rien n'a été envoyé.`, [
+          { text: 'Annuler', style: 'cancel' },
+          { text: 'Chercher quand même', onPress: () => searchOnline(true) },
+        ]);
+      } else if (!found) {
         Alert.alert('Rien trouvé', `Pas de paroles sur LRCLIB pour « ${track.title} ». Colle-les depuis un site, puis synchronise-les.`);
       } else if (found.synced) {
         Alert.alert('Paroles synchronisées trouvées', `Source : ${found.source}`, [
@@ -154,7 +160,7 @@ export default function LyricsEdit() {
         <Background />
         <DetailHeader title="Paroles" subtitle={`${track.artist} – ${track.title}`} icon="down" />
         <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-          <Button title={busy ? 'Recherche…' : 'Chercher en ligne (LRCLIB)'} icon="search" onPress={searchOnline} disabled={busy} />
+          <Button title={busy ? 'Recherche…' : 'Chercher en ligne (LRCLIB)'} icon="search" onPress={() => searchOnline()} disabled={busy} />
           <Txt variant="muted">Envoie seulement le titre et l’artiste à lrclib.net. Sinon, colle le texte copié depuis un site :</Txt>
           <TextInput
             value={text}

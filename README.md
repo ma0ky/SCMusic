@@ -2,7 +2,8 @@
 
 Lecteur de musique **local, libre et open source** (GPL-3.0) pour Android, construit avec Expo / React Native.
 Il lit les MP3 et FLAC que tu possèdes, sans compte, sans serveur, sans publicité.
-Il ne se connecte à Internet que pour chercher des paroles ([LRCLIB](https://lrclib.net)) ou des albums ([MusicBrainz](https://musicbrainz.org)) quand tu le demandes (titre et artiste seulement), et pour vérifier les mises à jour (une fois par jour au plus, désactivable).
+Il ne se connecte à Internet que pour chercher des paroles ([LRCLIB](https://lrclib.net)) ou des albums ([MusicBrainz](https://musicbrainz.org)) quand tu le demandes (titre et artiste seulement), et pour vérifier les mises à jour (une fois par semaine au plus, en Wi-Fi, désactivable).
+Chaque requête est coupée dès la réponse (15 s maximum), et **Réglages → Réseau → Mode hors ligne** bloque toute connexion d'un coup.
 
 ## Fonctionnalités (MVP)
 
@@ -44,7 +45,7 @@ Il est signé avec une clé de développement locale : suffisant pour un usage p
 ## Mises à jour sans câble
 
 Les APK signés sont publiés sur le dépôt public [ma0ky/SCMusic-releases](https://github.com/ma0ky/SCMusic-releases) (le code reste privé).
-À l'ouverture, au plus une fois par jour, l'app regarde s'il existe une version plus récente et propose **Mettre à jour** :
+À l'ouverture, au plus une fois par semaine et seulement en Wi-Fi (réglable), l'app regarde s'il existe une version plus récente et propose **Mettre à jour** :
 elle télécharge l'APK, vérifie son empreinte SHA-256, puis l'installateur d'Android demande de confirmer.
 La première fois, Android demande d'autoriser SCMusic à installer des applications. On peut aussi vérifier à la main, ou couper la vérification, dans **Réglages → Mises à jour**.
 

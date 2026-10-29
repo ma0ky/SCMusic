@@ -3,10 +3,10 @@
 // MusicBrainz demande au plus une requête par seconde et une application identifiée (User-Agent).
 import Constants from 'expo-constants';
 import type { Track } from '@/db/types';
+import { netFetch, OfflineError } from '@/net/network';
 import { normalize } from '@/search/search';
 
 const SEARCH_URL = 'https://musicbrainz.org/ws/2/recording/';
-const TIMEOUT_MS = 15000;
 /** Pause entre deux requêtes (règle d'usage de MusicBrainz : 1 par seconde). */
 export const REQUEST_INTERVAL_MS = 1100;
 /** MusicBrainz surchargé (503) : nouvelles tentatives après 2 s, 4 s puis 8 s. */
@@ -132,26 +132,19 @@ async function requestAlbum(
   if (track.artist && track.artist !== 'Artiste inconnu') query += ` AND artist:${luceneQuote(track.artist)}`;
   const params = new URLSearchParams({ query, fmt: 'json', limit: '10' });
 
-  const controller = new AbortController();
-  const abort = () => controller.abort();
-  signal?.addEventListener('abort', abort);
-  const timer = setTimeout(abort, TIMEOUT_MS);
   let res: Response;
   try {
-    res = await fetch(`${SEARCH_URL}?${params}`, {
-      signal: controller.signal,
+    res = await netFetch(`${SEARCH_URL}?${params}`, {
+      signal,
       headers: {
         'User-Agent': `SCMusic/${Constants.expoConfig?.version ?? ''} (https://github.com/ma0ky/SCMusic-releases)`,
         Accept: 'application/json',
-        Connection: 'close',
       },
     });
-  } catch {
+  } catch (e) {
+    if (e instanceof OfflineError) throw e;
     if (signal?.aborted) throw new Error('Recherche arrêtée.');
     throw new Error('Pas de connexion à Internet, ou MusicBrainz ne répond pas.');
-  } finally {
-    clearTimeout(timer);
-    signal?.removeEventListener('abort', abort);
   }
   if (res.status === 503 || res.status === 429) return 'busy';
   if (!res.ok) throw new Error(`MusicBrainz a répondu une erreur (${res.status}).`);

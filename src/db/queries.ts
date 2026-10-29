@@ -204,6 +204,25 @@ export async function saveAlbumLookup(
 
 // ---------- Paroles ----------
 
+/** Date (ms) d'une recherche de paroles restée sans résultat pour ce titre / artiste, ou null. */
+export async function lyricsNotFoundAt(track: Pick<Track, 'id' | 'title' | 'artist'>): Promise<number | null> {
+  const r = await getDb().getFirstAsync<{ looked_up_at: number }>(
+    'SELECT looked_up_at FROM lyrics_lookups WHERE track_id = ? AND query_title = ? AND query_artist = ?',
+    track.id, track.title, track.artist,
+  );
+  return r?.looked_up_at ?? null;
+}
+
+export async function saveLyricsNotFound(track: Pick<Track, 'id' | 'title' | 'artist'>): Promise<void> {
+  await getDb().runAsync(
+    `INSERT INTO lyrics_lookups (track_id, query_title, query_artist, looked_up_at) VALUES (?, ?, ?, ?)
+     ON CONFLICT(track_id) DO UPDATE SET query_title = excluded.query_title, query_artist = excluded.query_artist,
+       looked_up_at = excluded.looked_up_at`,
+    track.id, track.title, track.artist, Date.now(),
+  );
+}
+
+
 /** URIs des morceaux dont les tags n'ont jamais été inspectés pour les paroles (scannés avant la v3). */
 export async function urisWithoutLyricsCheck(): Promise<Set<string>> {
   const rows = await getDb().getAllAsync<{ uri: string }>('SELECT uri FROM tracks WHERE lyrics_checked = 0');

@@ -1,11 +1,12 @@
 // Recherche de paroles sur LRCLIB (https://lrclib.net) : base libre, gratuite, sans compte.
-// Seul accès Internet de l'app, et uniquement quand l'utilisateur appuie sur "Chercher en ligne".
-// Envoyé : titre et artiste du morceau. Rien d'autre (ni compte, ni identifiant d'appareil).
+// Uniquement quand l'utilisateur appuie sur "Chercher en ligne" ; envoyé : titre et artiste du morceau.
+// Une recherche sans résultat est gardée en mémoire pour ne pas redemander la même chose.
 import Constants from 'expo-constants';
+import { lyricsNotFoundAt, saveLyricsNotFound } from '@/db/queries';
 import type { Track } from '@/db/types';
+import { netFetch, OfflineError } from '@/net/network';
 
 const SEARCH_URL = 'https://lrclib.net/api/search';
-const TIMEOUT_MS = 15000;
 /** Écart de durée toléré entre le fichier et le résultat (versions radio, live…). */
 const DURATION_TOLERANCE = 8;
 
@@ -41,38 +42,53 @@ export function pickBestMatch(results: LrclibResult[], duration: number | null):
   );
 }
 
-/** Cherche les paroles d'un morceau. null = rien trouvé ; lève une erreur lisible si le réseau échoue. */
-export async function searchLyricsOnline(track: Pick<Track, 'title' | 'artist' | 'duration'>): Promise<FoundLyrics | null> {
+/** 1730000000000 → "27/10/2026" (date d'une recherche passée). */
+export function formatDay(ms: number): string {
+  const d = new Date(ms);
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+}
+
+export type LyricsSearch =
+  | { kind: 'found'; lyrics: FoundLyrics }
+  | { kind: 'none' } // rien sur LRCLIB (gardé en mémoire)
+  | { kind: 'already'; at: number }; // déjà cherché sans résultat : pas de nouvelle requête
+
+/**
+ * Cherche les paroles d'un morceau. Un titre déjà cherché sans résultat n'est pas redemandé
+ * (sauf `force`, ou si son titre / artiste a changé). Lève une erreur lisible si le réseau échoue.
+ */
+export async function searchLyricsOnline(
+  track: Pick<Track, 'id' | 'title' | 'artist' | 'duration'>,
+  force = false,
+): Promise<LyricsSearch> {
+  if (!force) {
+    const at = await lyricsNotFoundAt(track);
+    if (at != null) return { kind: 'already', at };
+  }
   const params = new URLSearchParams({ track_name: track.title });
   if (track.artist && track.artist !== 'Artiste inconnu') params.set('artist_name', track.artist);
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   let res: Response;
   try {
-    res = await fetch(`${SEARCH_URL}?${params}`, {
-      signal: controller.signal,
-      headers: {
-        // LRCLIB demande d'identifier l'application qui l'interroge
-        'User-Agent': `SCMusic ${Constants.expoConfig?.version ?? ''} (https://github.com/ma0ky/SCMusic)`,
-        // Une seule requête : la connexion est fermée dès la réponse reçue, au lieu de rester ouverte en réserve
-        Connection: 'close',
-      },
+    // LRCLIB demande d'identifier l'application qui l'interroge
+    res = await netFetch(`${SEARCH_URL}?${params}`, {
+      headers: { 'User-Agent': `SCMusic ${Constants.expoConfig?.version ?? ''} (https://github.com/ma0ky/SCMusic)` },
     });
-  } catch {
+  } catch (e) {
+    if (e instanceof OfflineError) throw e;
     throw new Error('Pas de connexion à Internet, ou LRCLIB ne répond pas.');
-  } finally {
-    clearTimeout(timer);
   }
   if (res.status === 503 || res.status === 429) throw new Error('LRCLIB est surchargé, réessaie dans un moment.');
   if (!res.ok) throw new Error(`LRCLIB a répondu une erreur (${res.status}).`);
 
   const best = pickBestMatch((await res.json()) as LrclibResult[], track.duration);
-  if (!best) return null;
+  if (!best) {
+    await saveLyricsNotFound(track);
+    return { kind: 'none' };
+  }
   const synced = !!best.syncedLyrics?.trim();
   return {
-    text: (synced ? best.syncedLyrics : best.plainLyrics)!.trim(),
-    synced,
-    source: `${best.artistName} – ${best.trackName}`,
+    kind: 'found',
+    lyrics: { text: (synced ? best.syncedLyrics : best.plainLyrics)!.trim(), synced, source: `${best.artistName} – ${best.trackName}` },
   };
 }

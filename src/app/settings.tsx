@@ -14,7 +14,8 @@ import { importFromFolder, importFromJsonFile, type ImportResult } from '@/shari
 import { useLibrary } from '@/store/useLibrary';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { colors, layout, radius, space } from '@/theme/tokens';
-import { currentVersion, getAutoCheck, setAutoCheck } from '@/update/updater';
+import { isOfflineMode, setOfflineMode } from '@/net/network';
+import { currentVersion, getAutoCheck, getWifiOnly, setAutoCheck, setWifiOnly } from '@/update/updater';
 import { UpdateProgress, useUpdater } from '@/update/useUpdater';
 
 /** Affiche un chemin SAF lisible : "content://…/tree/primary%3AMusic" → "Music". */
@@ -38,9 +39,15 @@ export default function Settings() {
   const { data: lists } = useLibrary(loadPlaylists, [] as Playlist[]);
   const updater = useUpdater();
   const [autoUpdate, setAutoUpdate] = useState(true);
+  const [wifiOnly, setWifiOnlyState] = useState(true);
+  const [offline, setOffline] = useState(false);
 
   useEffect(() => { getMusicDirUri().then(setDir); }, []);
-  useEffect(() => { getAutoCheck().then(setAutoUpdate); }, []);
+  useEffect(() => {
+    getAutoCheck().then(setAutoUpdate);
+    getWifiOnly().then(setWifiOnlyState);
+    isOfflineMode().then(setOffline);
+  }, []);
 
   /** Exécute une action longue en affichant son état et en attrapant les erreurs. */
   const run = async (label: string, action: () => Promise<void>) => {
@@ -159,18 +166,47 @@ export default function Settings() {
           <Txt variant="muted">Les titres d’une playlist reçue sont retrouvés dans ta bibliothèque par titre et artiste.</Txt>
         </GlassCard>
 
+        <SectionTitle>Réseau</SectionTitle>
+        <GlassCard style={styles.card}>
+          <View style={styles.switchRow}>
+            <View style={{ flex: 1 }}>
+              <Txt>Mode hors ligne</Txt>
+              <Txt variant="muted">Bloque toute connexion de SCMusic : recherche de paroles et d’albums, mises à jour. La lecture, les paroles déjà enregistrées et les stats marchent normalement.</Txt>
+            </View>
+            <Switch
+              value={offline}
+              onValueChange={(on) => { setOffline(on); setOfflineMode(on); }}
+              trackColor={{ true: colors.accent, false: colors.glassStrong }}
+              thumbColor={colors.text}
+            />
+          </View>
+        </GlassCard>
+
         <SectionTitle>Mises à jour</SectionTitle>
         <GlassCard style={styles.card}>
           <Txt>Version installée : {currentVersion()}</Txt>
-          <Button title="Vérifier les mises à jour" icon="down" onPress={() => run('Vérification…', () => updater.check(true))} disabled={!!busy || updater.progress != null} />
+          <Button title="Vérifier les mises à jour" icon="down" onPress={() => run('Vérification…', () => updater.check(true))} disabled={!!busy || updater.progress != null || offline} />
           <View style={styles.switchRow}>
             <View style={{ flex: 1 }}>
               <Txt>Vérifier à l’ouverture</Txt>
-              <Txt variant="muted">Au plus une fois par jour, une requête à GitHub (dépôt public SCMusic-releases). Aucune donnée personnelle envoyée.</Txt>
+              <Txt variant="muted">Au plus une fois par semaine, une requête à GitHub (dépôt public SCMusic-releases). Aucune donnée personnelle envoyée. Jamais en mode hors ligne.</Txt>
             </View>
             <Switch
               value={autoUpdate}
               onValueChange={(on) => { setAutoUpdate(on); setAutoCheck(on); }}
+              trackColor={{ true: colors.accent, false: colors.glassStrong }}
+              thumbColor={colors.text}
+            />
+          </View>
+          <View style={styles.switchRow}>
+            <View style={{ flex: 1 }}>
+              <Txt>Seulement en Wi-Fi</Txt>
+              <Txt variant="muted">La vérification automatique attend le Wi-Fi (rien en données mobiles).</Txt>
+            </View>
+            <Switch
+              value={wifiOnly}
+              disabled={!autoUpdate}
+              onValueChange={(on) => { setWifiOnlyState(on); setWifiOnly(on); }}
               trackColor={{ true: colors.accent, false: colors.glassStrong }}
               thumbColor={colors.text}
             />

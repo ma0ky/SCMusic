@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View, type ScrollViewInstance, type StyleProp, type ViewStyle } from 'react-native';
 import { setTrackLyrics, trackLyrics } from '@/db/queries';
 import type { Track } from '@/db/types';
-import { searchLyricsOnline } from '@/library/lrclib';
+import { formatDay, searchLyricsOnline } from '@/library/lrclib';
 import { activeLineIndex, parseLyrics, type Lyrics } from '@/library/lyrics';
 import { colors, font, space } from '@/theme/tokens';
 import { usePlayerStore } from '@/store/usePlayerStore';
@@ -54,11 +54,18 @@ export function LyricsView({ track, position, onSeek, style }: Props) {
     if (y != null) scroll.current?.scrollTo({ y: Math.max(0, y - viewHeight.current / 3), animated: true });
   }, [active]);
 
-  const searchOnline = async () => {
+  const searchOnline = async (force = false) => {
     setSearching(true);
     try {
-      const found = await searchLyricsOnline(track);
-      if (found) {
+      const result = await searchLyricsOnline(track, force);
+      if (result.kind === 'already') {
+        Alert.alert('Déjà cherché', `LRCLIB n'avait rien pour « ${track.title} » le ${formatDay(result.at)}. Pour ne pas redemander, rien n'a été envoyé.`, [
+          { text: 'Coller', onPress: () => router.push('/lyrics-edit') },
+          { text: 'Annuler', style: 'cancel' },
+          { text: 'Chercher quand même', onPress: () => searchOnline(true) },
+        ]);
+      } else if (result.kind === 'found') {
+        const found = result.lyrics;
         await setTrackLyrics(track.id, found.text);
         libraryChanged();
         if (!found.synced) {
@@ -86,7 +93,7 @@ export function LyricsView({ track, position, onSeek, style }: Props) {
       <GlassCard style={[styles.card, style]}>
         <EmptyState icon="lyrics" title="Pas de paroles" text="Cherche-les en ligne, colle-les depuis un site, ou ajoute un fichier nom.lrc à côté de nom.mp3.">
           <View style={styles.actions}>
-            <Button title={searching ? 'Recherche…' : 'Chercher en ligne'} icon="search" onPress={searchOnline} disabled={searching} />
+            <Button title={searching ? 'Recherche…' : 'Chercher en ligne'} icon="search" onPress={() => searchOnline()} disabled={searching} />
             <Button title="Coller / écrire" kind="ghost" icon="edit" onPress={() => router.push('/lyrics-edit')} />
           </View>
         </EmptyState>

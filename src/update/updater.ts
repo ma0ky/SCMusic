@@ -1,5 +1,6 @@
 // Mises à jour sans store : les APK signés sont publiés sur un dépôt GitHub public dédié.
-// À l'ouverture (au plus une fois par jour), une requête demande la dernière version.
+// À l'ouverture (au plus une fois par semaine, en Wi-Fi par défaut, jamais en mode hors ligne),
+// une requête demande la dernière version.
 // Si elle est plus récente et que l'utilisateur accepte : téléchargement, vérification SHA-256,
 // puis l'installateur d'Android prend le relais (il refuse un APK signé avec une autre clé).
 import Constants from 'expo-constants';
@@ -7,16 +8,17 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { startActivityAsync } from 'expo-intent-launcher';
 import { Platform } from 'react-native';
 import { getSetting, setSetting } from '@/db/queries';
+import { isOfflineMode, netDownload, netFetch, OfflineError, onWifi } from '@/net/network';
 
 const RELEASES_URL = 'https://api.github.com/repos/ma0ky/SCMusic-releases/releases/latest';
-const CHECK_EVERY_MS = 24 * 60 * 60 * 1000;
+const CHECK_EVERY_MS = 7 * 24 * 60 * 60 * 1000;
 const LAST_CHECK_KEY = 'updateLastCheck';
 const SKIPPED_KEY = 'updateSkippedVersion';
 const AUTO_KEY = 'updateAutoCheck';
+const WIFI_KEY = 'updateWifiOnly';
 const HEADERS = {
   'User-Agent': 'SCMusic (https://github.com/ma0ky/SCMusic-releases)',
   Accept: 'application/vnd.github+json',
-  Connection: 'close', // rien ne reste ouvert après la vérification
 };
 
 export interface UpdateInfo {
@@ -71,19 +73,24 @@ export function parseRelease(release: GithubRelease): UpdateInfo | null {
 }
 
 /**
- * Cherche une version plus récente. Sans `force`, ne fait rien si la dernière vérification
- * date de moins d'un jour ou si l'utilisateur a choisi d'ignorer cette version.
+ * Cherche une version plus récente. Sans `force` (vérification automatique), ne fait rien :
+ * en mode hors ligne, si elle est désactivée, hors Wi-Fi (si demandé), si la dernière date
+ * de moins d'une semaine, ou si l'utilisateur a choisi d'ignorer cette version.
  */
 export async function checkForUpdate(force = false): Promise<UpdateInfo | null> {
   if (Platform.OS !== 'android') return null;
   const last = Number(await getSetting(LAST_CHECK_KEY)) || 0;
-  if (!force && (!(await getAutoCheck()) || Date.now() - last < CHECK_EVERY_MS)) return null;
+  if (!force) {
+    if ((await isOfflineMode()) || !(await getAutoCheck()) || Date.now() - last < CHECK_EVERY_MS) return null;
+    if ((await getWifiOnly()) && !(await onWifi())) return null;
+  }
 
   let res: Response;
   try {
-    res = await fetch(RELEASES_URL, { headers: HEADERS });
-  } catch {
-    throw new Error('Pas de connexion à Internet.');
+    res = await netFetch(RELEASES_URL, { headers: HEADERS });
+  } catch (e) {
+    if (e instanceof OfflineError) throw e;
+    throw new Error('Pas de connexion à Internet, ou GitHub ne répond pas.');
   }
   await setSetting(LAST_CHECK_KEY, String(Date.now()));
   if (res.status === 404) return null; // aucune version publiée
@@ -93,6 +100,15 @@ export async function checkForUpdate(force = false): Promise<UpdateInfo | null> 
   if (!info || compareVersions(info.version, currentVersion()) <= 0) return null;
   if (!force && (await getSetting(SKIPPED_KEY)) === info.version) return null;
   return info;
+}
+
+/** Vérification automatique seulement en Wi-Fi (activé par défaut). */
+export async function getWifiOnly(): Promise<boolean> {
+  return (await getSetting(WIFI_KEY)) !== '0';
+}
+
+export async function setWifiOnly(on: boolean): Promise<void> {
+  await setSetting(WIFI_KEY, on ? '1' : '0');
 }
 
 /** Vérification automatique à l'ouverture (activée par défaut). */
@@ -117,18 +133,25 @@ export async function downloadAndInstall(info: UpdateInfo, onProgress?: (fractio
 
   let apk: File;
   try {
-    apk = await File.downloadFileAsync(info.apkUrl, target, {
-      idempotent: true,
+    apk = await netDownload(info.apkUrl, target, {
       headers: { 'User-Agent': HEADERS['User-Agent'] },
       onProgress: ({ bytesWritten, totalBytes }) => onProgress?.(bytesWritten / (totalBytes || info.size || 1)),
     });
-  } catch {
+  } catch (e) {
+    if (e instanceof OfflineError) throw e;
     throw new Error('Téléchargement interrompu. Vérifie ta connexion et réessaie.');
   }
 
   if (info.sha256Url) {
     // Fichier "empreinte  nom.apk" produit par scripts/sign-apk.sh
-    const expected = (await (await fetch(info.sha256Url, { headers: HEADERS })).text()).trim().split(/\s+/)[0].toLowerCase();
+    let expected: string;
+    try {
+      expected = (await (await netFetch(info.sha256Url, { headers: HEADERS })).text()).trim().split(/\s+/)[0].toLowerCase();
+    } catch (e) {
+      apk.delete();
+      if (e instanceof OfflineError) throw e;
+      throw new Error('Impossible de vérifier le fichier téléchargé. Réessaie plus tard.');
+    }
     const actual = await apk.digest('SHA-256');
     if (expected !== actual) {
       apk.delete();
