@@ -25,5 +25,6 @@ mkdir -p dist
   "$OUT"
 "$BUILD_TOOLS/apksigner" verify --print-certs "$OUT" | grep -E "SHA-256|Signer"
 unset SCMUSIC_KS_PASS
-sha256sum "$OUT" | tee "$OUT.sha256"
+# Nom seul (sans dist/) : la vérification se fait depuis dist/, et le fichier est publié tel quel
+(cd "$(dirname "$OUT")" && sha256sum "$(basename "$OUT")") | tee "$OUT.sha256"
 echo "APK signé : $OUT"
